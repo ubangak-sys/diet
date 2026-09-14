@@ -8,24 +8,9 @@ import { getMyFamily } from "@/lib/family";
 import { DailyAdvice, Family, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
+import { extractError } from "@/lib/edge-errors";
 
 type Tab = "personal" | "dinner";
-
-function extractError(err: unknown): string {
-  if (!err) return "Неизвестная ошибка";
-  const e = err as { context?: unknown; message?: string };
-  try {
-    if (e.context) {
-      const parsed =
-        typeof e.context === "string" ? JSON.parse(e.context) : e.context;
-      const inner = parsed as { error?: string };
-      if (inner?.error) return inner.error;
-    }
-  } catch {
-    /* ignore */
-  }
-  return e.message ?? "Неизвестная ошибка";
-}
 
 export default function AdvicePage() {
   const { user } = useAuth();
@@ -107,7 +92,7 @@ export default function AdvicePage() {
     setGenerating(false);
 
     if (fnError) {
-      setError(extractError(fnError));
+      setError(await extractError(fnError));
       return;
     }
     if (data?.error) {

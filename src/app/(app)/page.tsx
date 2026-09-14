@@ -15,22 +15,7 @@ import {
 } from "@/lib/types";
 import { todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
-
-function extractError(err: unknown): string {
-  if (!err) return "Неизвестная ошибка";
-  const e = err as { context?: unknown; message?: string };
-  try {
-    if (e.context) {
-      const parsed =
-        typeof e.context === "string" ? JSON.parse(e.context) : e.context;
-      const inner = parsed as { error?: string };
-      if (inner?.error) return inner.error;
-    }
-  } catch {
-    /* ignore */
-  }
-  return e.message ?? "Неизвестная ошибка";
-}
+import { extractError } from "@/lib/edge-errors";
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -110,7 +95,7 @@ export default function DashboardPage() {
     setGeneratingDinner(false);
 
     if (fnError) {
-      setDinnerError(extractError(fnError));
+      setDinnerError(await extractError(fnError));
       return;
     }
     if (data?.error) {

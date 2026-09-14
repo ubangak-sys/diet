@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
 import { supabase } from "@/lib/supabase";
+import { extractError } from "@/lib/edge-errors";
 
 export function FeedbackModal({
   open,
@@ -41,8 +42,12 @@ export function FeedbackModal({
       { body: { name, email, message } },
     );
     setSending(false);
-    if (fnError || data?.error) {
-      setError(data?.error || fnError?.message || "Не удалось отправить");
+    if (fnError) {
+      setError(await extractError(fnError));
+      return;
+    }
+    if (data?.error) {
+      setError(data.error);
       return;
     }
     setDone(true);
