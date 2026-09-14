@@ -1,30 +1,58 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { MEAL_TYPES, MealEntry, MealType, mealTypeLabel } from "@/lib/types";
+import { getMyFamily } from "@/lib/family";
+import {
+  Family,
+  MEAL_TYPES,
+  MealEntry,
+  MealType,
+  mealTypeLabel,
+} from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 
 export default function LogPage() {
   const { user } = useAuth();
+  const [family, setFamily] = useState<Family | null>(null);
   const [date, setDate] = useState(todayLocal());
   const [entries, setEntries] = useState<MealEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
   const [mealType, setMealType] = useState<MealType>("breakfast");
+  const [forUserId, setForUserId] = useState("");
   const [dishName, setDishName] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
+  const isOwner = family?.owner_id === user?.id;
+  const members = family?.members ?? [];
+
+  const loadFamily = useCallback(async () => {
+    try {
+      setFamily(await getMyFamily());
+    } catch {
+      /* нет семьи — ок */
+    }
+  }, []);
+
+  useEffect(() => {
+    loadFamily();
+  }, [loadFamily]);
+
+  useEffect(() => {
+    if (user) setForUserId(user.id);
+  }, [user]);
+
   async function loadEntries() {
     if (!user) return;
     setLoading(true);
+    // Без фильтра по user_id: RLS вернёт свои + записи членов семьи
     const { data } = await supabase
       .from("meal_entries")
       .select("*")
-      .eq("user_id", user.id)
       .eq("entry_date", date)
       .order("created_at", { ascending: true });
     setEntries(data ?? []);
@@ -36,13 +64,24 @@ export default function LogPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, date]);
 
+  function displayName(uid: string): string {
+    if (uid === user?.id) return "Вы";
+    const m = members.find((x) => x.user_id === uid);
+    return m?.full_name || m?.email || "Участник";
+  }
+
+  function canDelete(e: MealEntry): boolean {
+    return e.user_id === user?.id || !!isOwner;
+  }
+
   async function addEntry(e: React.FormEvent) {
     e.preventDefault();
     if (!dishName.trim()) return;
     setSaving(true);
     setError("");
+    const target = isOwner && members.length > 1 ? forUserId : user!.id;
     const { error } = await supabase.from("meal_entries").insert({
-      user_id: user!.id,
+      user_id: target,
       entry_date: date,
       meal_type: mealType,
       dish_name: dishName.trim(),
@@ -69,7 +108,9 @@ export default function LogPage() {
         <div>
           <h1 className="text-2xl font-bold">Дневник питания</h1>
           <p className="text-stone-500">
-            Фиксируйте, что вы ели, по приёмам пищи.
+            {family
+              ? "Общий дневник семьи — видны приёмы пищи всех участников."
+              : "Фиксируйте, что вы ели, по приёмам пищи."}
           </p>
         </div>
         <input
@@ -83,6 +124,29 @@ export default function LogPage() {
       <div className="grid gap-6 lg:grid-cols-5">
         <form onSubmit={addEntry} className="card space-y-4 lg:col-span-2">
           <h2 className="font-semibold">Добавить приём пищи</h2>
+
+          {isOwner && members.length > 1 && (
+            <div>
+              <label htmlFor="forUserId" className="label">
+                Для кого
+              </label>
+              <select
+                id="forUserId"
+                className="input"
+                value={forUserId}
+                onChange={(e) => setForUserId(e.target.value)}
+              >
+                <option value={user!.id}>Вы</option>
+                {members
+                  .filter((m) => m.user_id !== user!.id)
+                  .map((m) => (
+                    <option key={m.user_id} value={m.user_id}>
+                      {m.full_name || m.email || "Участник"}
+                    </option>
+                  ))}
+              </select>
+            </div>
+          )}
 
           <div>
             <label className="label">Приём пищи</label>
@@ -170,8 +234,13 @@ export default function LogPage() {
                           className="group flex items-start justify-between gap-2 rounded-lg bg-stone-50 px-3 py-2"
                         >
                           <div>
-                            <div className="text-sm font-medium">
-                              {e.dish_name}
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-medium">
+                                {e.dish_name}
+                              </span>
+                              <span className="rounded bg-white px-1.5 py-0.5 text-xs text-stone-500">
+                                {displayName(e.user_id)}
+                              </span>
                             </div>
                             {e.notes && (
                               <div className="text-xs text-stone-500">
@@ -179,13 +248,15 @@ export default function LogPage() {
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={() => removeEntry(e.id)}
-                            className="text-xs text-stone-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100"
-                            title="Удалить"
-                          >
-                            ✕
-                          </button>
+                          {canDelete(e) && (
+                            <button
+                              onClick={() => removeEntry(e.id)}
+                              className="text-xs text-stone-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                              title="Удалить"
+                            >
+                              ✕
+                            </button>
+                          )}
                         </li>
                       ))}
                     </ul>

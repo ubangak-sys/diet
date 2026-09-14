@@ -7,6 +7,7 @@ import { useAuth } from "./AuthProvider";
 const NAV = [
   { href: "/", label: "Главная", emoji: "🏠" },
   { href: "/log", label: "Дневник", emoji: "📝" },
+  { href: "/family", label: "Семья", emoji: "👨‍👩‍👧" },
   { href: "/preferences", label: "Предпочтения", emoji: "🥗" },
   { href: "/advice", label: "Советы", emoji: "💡" },
 ];

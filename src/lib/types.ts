@@ -58,3 +58,30 @@ export const DIETARY_OPTIONS = [
   "Низкоуглеводное",
   "Спортивное питание",
 ] as const;
+
+export type FamilyRole = "owner" | "member";
+
+export interface FamilyMember {
+  user_id: string;
+  role: FamilyRole;
+  full_name: string;
+  email: string;
+  joined_at: string;
+}
+
+export interface Family {
+  id: string;
+  name: string;
+  invite_code: string;
+  owner_id: string;
+  created_at: string;
+  members: FamilyMember[];
+}
+
+export interface FamilyAdvice {
+  id: string;
+  family_id: string;
+  advice_date: string;
+  content: string;
+  created_at: string;
+}
