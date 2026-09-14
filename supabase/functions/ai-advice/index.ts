@@ -39,15 +39,23 @@ const SYSTEM_PROMPT = `Ты — персональный нутрициолог.
 7. Оформи ответ как структурированный список с эмодзи.
 8. Никогда не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
 
-const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь ПЛАН ужинов на 3–7 дней для всей семьи.
+const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь ПЛАН из 3 ужинов для всей семьи.
 
 Ответ верни СТРОГО как JSON-объект (без markdown и пояснений вокруг) в таком формате:
 {
   "dinners": [
-    { "day": 1, "title": "Название блюда", "why": "почему подходит и кому" }
+    {
+      "day": 1,
+      "title": "Основное блюдо дня 1",
+      "why": "почему подходит и кому",
+      "variants": ["альтернативный вариант 2", "альтернативный вариант 3"],
+      "cooking": "краткая инструкция приготовления (2–3 шага)"
+    },
+    { "day": 2, "title": "Блюдо дня 2", "why": "почему подходит" },
+    { "day": 3, "title": "Блюдо дня 3", "why": "почему подходит" }
   ],
   "shopping": [
-    { "item": "Ингредиент", "amount": "количество на все дни" }
+    { "item": "Ингредиент", "amount": "количество ТОЛЬКО для дня 1" }
   ],
   "lunchboxes": [
     { "for": "Имя школьника", "note": "что положить с собой" }
@@ -58,11 +66,13 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 1. Отвечай на русском.
 2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет.
 3. Учитывай роль, возраст, вкусы и недавнее меню.
-4. dinners — 3–7 ужинов; если вкусы сильно расходятся, основной вариант в title, альтернативу — в why.
-5. shopping — единый список покупок на все дни, с количеством.
-6. lunchboxes — только для школьников старше 7 лет; если таких нет, верни пустой массив.
-7. «Пожелания по ужину» — мягкие, учитывай при возможности.
-8. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
+4. Всего РОВНО 3 ужина (day 1, 2, 3).
+5. День 1 — самый подробный: 1 основное блюдо + 2 альтернативных варианта в "variants" + краткая инструкция в "cooking".
+6. Дни 2 и 3 — коротко: только title и why.
+7. shopping — список покупок ТОЛЬКО для дня 1, с количеством.
+8. lunchboxes — только для школьников старше 7 лет; если таких нет, верни пустой массив.
+9. «Пожелания по ужину» — мягкие, учитывай при возможности.
+10. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
 
 type Row = Record<string, unknown>;
 
@@ -73,6 +83,8 @@ interface DinnerPlanItem {
   day?: number | string;
   title: string;
   why?: string;
+  variants?: string[];
+  cooking?: string;
 }
 interface ShoppingItem {
   item: string;
@@ -99,10 +111,15 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
       const dinners = (Array.isArray(raw.dinners) ? raw.dinners : [])
         .map((d) => {
           const o = (d ?? {}) as Record<string, unknown>;
+          const variants = Array.isArray(o.variants)
+            ? o.variants.map((v) => String(v).trim()).filter(Boolean)
+            : undefined;
           return {
             day: o.day ?? o.number,
             title: String(o.title ?? o.dish ?? "").trim(),
             why: o.why != null ? String(o.why) : undefined,
+            variants: variants && variants.length ? variants : undefined,
+            cooking: o.cooking != null ? String(o.cooking) : undefined,
           };
         })
         .filter((d) => d.title);
@@ -266,7 +283,7 @@ function buildDinnerPrompt(
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}${schoolSection}
 
-Составь JSON-план ужинов на 3–7 дней: dinners, единый shopping-список${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ».`;
+Составь JSON-план из 3 ужинов: dinners, единый shopping-список для дня 1${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ».`;
 }
 
 async function callLLMOnce(

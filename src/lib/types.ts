@@ -100,6 +100,8 @@ export interface DinnerPlanItem {
   day?: number | string;
   title: string;
   why?: string;
+  variants?: string[];
+  cooking?: string;
 }
 
 export interface ShoppingItem {

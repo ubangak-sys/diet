@@ -40,7 +40,7 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
             {plan.dinners.map((d, i) => (
               <li key={i} className="rounded-lg bg-stone-50 px-3 py-2">
                 <div className="flex items-start justify-between gap-2">
-                  <div>
+                  <div className="min-w-0">
                     <div className="text-sm font-medium">
                       {d.day != null && (
                         <span className="mr-1 text-stone-400">
@@ -52,6 +52,22 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
                     {d.why && (
                       <div className="mt-0.5 text-xs text-stone-500">
                         {d.why}
+                      </div>
+                    )}
+                    {d.variants && d.variants.length > 0 && (
+                      <div className="mt-1 text-xs text-stone-500">
+                        <span className="font-medium text-stone-600">
+                          Варианты:
+                        </span>{" "}
+                        {d.variants.join(" · ")}
+                      </div>
+                    )}
+                    {d.cooking && (
+                      <div className="mt-1 rounded-md bg-white px-2 py-1 text-xs text-stone-600">
+                        <span className="font-medium">
+                          👨‍🍳 Приготовление:
+                        </span>{" "}
+                        {d.cooking}
                       </div>
                     )}
                   </div>
