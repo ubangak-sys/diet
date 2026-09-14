@@ -1,11 +1,35 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { DailyAdvice, MealEntry, Profile, mealTypeLabel } from "@/lib/types";
+import { getMyFamily } from "@/lib/family";
+import {
+  DailyAdvice,
+  Family,
+  FamilyAdvice,
+  MealEntry,
+  Profile,
+  mealTypeLabel,
+} from "@/lib/types";
 import { todayLocal } from "@/lib/utils";
+
+function extractError(err: unknown): string {
+  if (!err) return "Неизвестная ошибка";
+  const e = err as { context?: unknown; message?: string };
+  try {
+    if (e.context) {
+      const parsed =
+        typeof e.context === "string" ? JSON.parse(e.context) : e.context;
+      const inner = parsed as { error?: string };
+      if (inner?.error) return inner.error;
+    }
+  } catch {
+    /* ignore */
+  }
+  return e.message ?? "Неизвестная ошибка";
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -13,9 +37,30 @@ export default function DashboardPage() {
   const [todayMeals, setTodayMeals] = useState<MealEntry[]>([]);
   const [latestAdvice, setLatestAdvice] = useState<DailyAdvice | null>(null);
 
+  const [family, setFamily] = useState<Family | null>(null);
+  const [dinner, setDinner] = useState<FamilyAdvice | null>(null);
+  const [generatingDinner, setGeneratingDinner] = useState(false);
+  const [dinnerError, setDinnerError] = useState("");
+
+  const today = todayLocal();
+
+  const loadDinner = useCallback(async () => {
+    if (!family) {
+      setDinner(null);
+      return;
+    }
+    const { data } = await supabase
+      .from("family_advice")
+      .select("*")
+      .eq("family_id", family.id)
+      .order("advice_date", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    setDinner(data ?? null);
+  }, [family]);
+
   useEffect(() => {
     if (!user) return;
-    const today = todayLocal();
 
     supabase
       .from("profiles")
@@ -40,20 +85,108 @@ export default function DashboardPage() {
       .limit(1)
       .maybeSingle()
       .then(({ data }) => setLatestAdvice(data ?? null));
+
+    getMyFamily()
+      .then(setFamily)
+      .catch(() => setFamily(null));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
+
+  useEffect(() => {
+    loadDinner();
+  }, [loadDinner]);
+
+  async function generateDinner() {
+    if (!user || !family) return;
+    setGeneratingDinner(true);
+    setDinnerError("");
+
+    const { data, error: fnError } = await supabase.functions.invoke(
+      "ai-advice",
+      { body: { date: todayLocal(), mode: "dinner" } },
+    );
+
+    setGeneratingDinner(false);
+
+    if (fnError) {
+      setDinnerError(extractError(fnError));
+      return;
+    }
+    if (data?.error) {
+      setDinnerError(data.error);
+      return;
+    }
+    await loadDinner();
+  }
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "друг";
 
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">
-          Привет, {name}! 👋
-        </h1>
+        <h1 className="text-2xl font-bold">Привет, {name}! 👋</h1>
         <p className="text-stone-500">
           Вот сводка по вашему рациону на сегодня.
         </p>
       </div>
+
+      <section className="card">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">
+              Рекомендация по ужину 🍽️
+            </h2>
+            <p className="text-sm text-stone-500">
+              {family
+                ? "Что приготовить всей семье на ужин."
+                : "Объединитесь в семью, чтобы получать рекомендации по ужину."}
+            </p>
+          </div>
+          {family && (
+            <button
+              onClick={generateDinner}
+              disabled={generatingDinner}
+              className="btn-primary"
+            >
+              {generatingDinner
+                ? "ИИ думает…"
+                : dinner?.advice_date === today
+                  ? "Обновить"
+                  : "Получить рекомендацию"}
+            </button>
+          )}
+        </div>
+
+        {dinnerError && (
+          <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+            {dinnerError}
+          </p>
+        )}
+
+        {!family ? (
+          <p className="mt-3 text-sm text-stone-500">
+            <Link
+              href="/family"
+              className="font-medium text-brand-600 hover:underline"
+            >
+              Создайте или присоединитесь к семье →
+            </Link>
+          </p>
+        ) : generatingDinner ? (
+          <div className="mt-3 flex items-center gap-2 text-sm text-stone-500">
+            <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-brand-600" />
+            Составляем рекомендацию по ужину…
+          </div>
+        ) : dinner ? (
+          <div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-stone-700">
+            {dinner.content}
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-stone-500">
+            Рекомендации пока нет — нажмите «Получить рекомендацию».
+          </p>
+        )}
+      </section>
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Link href="/log" className="card hover:border-brand-500 transition">
@@ -112,7 +245,7 @@ export default function DashboardPage() {
 
         <section className="card">
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="font-semibold">Последний совет</h2>
+            <h2 className="font-semibold">Личный совет</h2>
             <Link
               href="/advice"
               className="text-sm font-medium text-brand-600 hover:underline"
