@@ -160,6 +160,8 @@ async function callLLM(system: string, prompt: string): Promise<string> {
   const baseUrl = Deno.env.get("AI_BASE_URL") || "https://api.deepseek.com";
   const apiKey = Deno.env.get("AI_API_KEY");
   const model = Deno.env.get("AI_MODEL") || "deepseek-chat";
+  // Таймаут, чтобы не упираться в лимит 150с Edge Function (бесплатный тариф)
+  const timeoutMs = Number(Deno.env.get("AI_TIMEOUT_MS") || "70000");
 
   if (!apiKey) {
     throw new Error(
@@ -167,32 +169,47 @@ async function callLLM(system: string, prompt: string): Promise<string> {
     );
   }
 
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: "system", content: system },
-        { role: "user", content: prompt },
-      ],
-      temperature: 0.7,
-      max_tokens: 1600,
-    }),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`AI API error ${res.status}: ${text.slice(0, 500)}`);
+  try {
+    const res = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.7,
+        max_tokens: 1200,
+      }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`AI API error ${res.status}: ${text.slice(0, 500)}`);
+    }
+
+    const data = await res.json();
+    const content: string | undefined = data?.choices?.[0]?.message?.content;
+    if (!content) throw new Error("Пустой ответ от ИИ");
+    return content.trim();
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      throw new Error(
+        "ИИ не ответил вовремя (таймаут). Попробуйте ещё раз.",
+      );
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
   }
-
-  const data = await res.json();
-  const content: string | undefined = data?.choices?.[0]?.message?.content;
-  if (!content) throw new Error("Пустой ответ от ИИ");
-  return content.trim();
 }
 
 async function personalAdvice(
@@ -207,7 +224,7 @@ async function personalAdvice(
       .select("*")
       .eq("user_id", userId)
       .order("entry_date", { ascending: false })
-      .limit(60),
+      .limit(30),
   ]);
 
   const prompt = buildPersonalPrompt(prefsRes.data ?? null, mealsRes.data ?? [], date);
@@ -261,7 +278,7 @@ async function dinnerAdvice(
           .select("*")
           .eq("user_id", uid)
           .order("entry_date", { ascending: false })
-          .limit(40),
+          .limit(15),
         db
           .from("profiles")
           .select("full_name, email, age")
