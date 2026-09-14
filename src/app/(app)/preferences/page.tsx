@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { DIETARY_OPTIONS, Preferences } from "@/lib/types";
+import { getMyFamily } from "@/lib/family";
+import { DIETARY_OPTIONS, Family, Preferences } from "@/lib/types";
 import { arrayToText, textToArray } from "@/lib/utils";
 
 const EMPTY: Preferences = {
@@ -21,6 +22,9 @@ const EMPTY: Preferences = {
 export default function PreferencesPage() {
   const { user } = useAuth();
 
+  const [family, setFamily] = useState<Family | null>(null);
+  const [selectedUserId, setSelectedUserId] = useState("");
+
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
 
@@ -36,18 +40,41 @@ export default function PreferencesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
+  const members = family?.members ?? [];
+  const me = members.find((m) => m.user_id === user?.id);
+  const isParent = me?.member_role === "mom" || me?.member_role === "dad";
+  const kids = members.filter((m) => m.member_role === "kid");
+  const editingChild = !!selectedUserId && selectedUserId !== user?.id;
+
+  const loadFamily = useCallback(async () => {
+    try {
+      setFamily(await getMyFamily());
+    } catch {
+      setFamily(null);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!user) return;
+    loadFamily();
+  }, [loadFamily]);
+
+  useEffect(() => {
+    if (user) setSelectedUserId(user.id);
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedUserId) return;
+    setLoading(true);
     Promise.all([
       supabase
         .from("profiles")
         .select("full_name, age")
-        .eq("id", user.id)
+        .eq("id", selectedUserId)
         .maybeSingle(),
       supabase
         .from("preferences")
         .select("*")
-        .eq("user_id", user.id)
+        .eq("user_id", selectedUserId)
         .maybeSingle(),
     ]).then(([profileRes, prefsRes]) => {
       const prof = profileRes.data;
@@ -64,7 +91,7 @@ export default function PreferencesPage() {
       setNotes(p.notes ?? "");
       setLoading(false);
     });
-  }, [user]);
+  }, [selectedUserId]);
 
   function toggleRestriction(opt: string) {
     setRestrictions((prev) =>
@@ -74,20 +101,24 @@ export default function PreferencesPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!user) return;
+    if (!selectedUserId) return;
     setSaving(true);
     setMessage("");
 
     const ageNum = age.trim() ? Number(age) : null;
 
+    const profileUpdate = editingChild
+      ? { age: ageNum }
+      : { full_name: fullName.trim() || null, age: ageNum };
+
     const profileRes = await supabase
       .from("profiles")
-      .update({ full_name: fullName.trim() || null, age: ageNum })
-      .eq("id", user.id);
+      .update(profileUpdate)
+      .eq("id", selectedUserId);
 
     const prefsRes = await supabase.from("preferences").upsert(
       {
-        user_id: user.id,
+        user_id: selectedUserId,
         liked_dishes: textToArray(liked),
         disliked_dishes: textToArray(disliked),
         cuisines: textToArray(cuisines),
@@ -107,6 +138,7 @@ export default function PreferencesPage() {
       setMessage(`Ошибка: ${prefsRes.error.message}`);
     } else {
       setMessage("Сохранено ✅ ИИ учтёт это в советах и рекомендациях.");
+      await loadFamily();
     }
   }
 
@@ -124,9 +156,32 @@ export default function PreferencesPage() {
         </p>
       </div>
 
+      {isParent && kids.length > 0 && (
+        <div className="card">
+          <label htmlFor="memberSelect" className="label">
+            Чьи предпочтения редактируете
+          </label>
+          <select
+            id="memberSelect"
+            className="input"
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+          >
+            <option value={user!.id}>Мои (вы)</option>
+            {kids.map((k) => (
+              <option key={k.user_id} value={k.user_id}>
+                {k.full_name || k.email || "Ребёнок"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       <form onSubmit={onSubmit} className="card space-y-5">
         <div>
-          <h2 className="mb-3 font-semibold">Профиль</h2>
+          <h2 className="mb-3 font-semibold">
+            {editingChild ? "Профиль ребёнка" : "Профиль"}
+          </h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="fullName" className="label">
@@ -135,9 +190,10 @@ export default function PreferencesPage() {
               <input
                 id="fullName"
                 type="text"
-                className="input"
+                className="input disabled:bg-stone-50"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
+                disabled={editingChild}
                 placeholder="Как к вам обращаться"
               />
             </div>
@@ -166,7 +222,7 @@ export default function PreferencesPage() {
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label htmlFor="liked" className="label">
-                Что вы любите 🥰
+                Что {editingChild ? "любит" : "вы любите"} 🥰
               </label>
               <textarea
                 id="liked"
@@ -181,7 +237,7 @@ export default function PreferencesPage() {
             </div>
             <div>
               <label htmlFor="disliked" className="label">
-                Что не любите 🙅
+                Что {editingChild ? "не любит" : "не любите"} 🙅
               </label>
               <textarea
                 id="disliked"
@@ -286,7 +342,11 @@ export default function PreferencesPage() {
         )}
 
         <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? "Сохраняем…" : "Сохранить"}
+          {saving
+            ? "Сохраняем…"
+            : editingChild
+              ? "Сохранить предпочтения ребёнка"
+              : "Сохранить"}
         </button>
       </form>
     </div>
