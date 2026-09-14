@@ -7,6 +7,7 @@ import { supabase } from "@/lib/supabase";
 import { getMyFamily } from "@/lib/family";
 import { DailyAdvice, Family, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
+import { Markdown } from "@/components/Markdown";
 
 type Tab = "personal" | "dinner";
 
@@ -209,9 +210,7 @@ export default function AdvicePage() {
                   </span>
                 )}
               </div>
-              <p className="whitespace-pre-line text-sm leading-relaxed text-stone-700">
-                {a.content}
-              </p>
+              <Markdown content={a.content} />
             </article>
           ))}
         </div>

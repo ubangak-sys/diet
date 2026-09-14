@@ -14,6 +14,7 @@ import {
   mealTypeLabel,
 } from "@/lib/types";
 import { todayLocal } from "@/lib/utils";
+import { Markdown } from "@/components/Markdown";
 
 function extractError(err: unknown): string {
   if (!err) return "Неизвестная ошибка";
@@ -178,8 +179,8 @@ export default function DashboardPage() {
             Составляем рекомендацию по ужину…
           </div>
         ) : dinner ? (
-          <div className="mt-3 max-h-96 overflow-y-auto whitespace-pre-line text-sm leading-relaxed text-stone-700">
-            {dinner.content}
+          <div className="mt-3 max-h-96 overflow-y-auto">
+            <Markdown content={dinner.content} />
           </div>
         ) : (
           <p className="mt-3 text-sm text-stone-500">
@@ -254,10 +255,9 @@ export default function DashboardPage() {
             </Link>
           </div>
           {latestAdvice ? (
-            <p className="whitespace-pre-line text-sm leading-relaxed text-stone-700">
-              {latestAdvice.content.slice(0, 400)}
-              {latestAdvice.content.length > 400 ? "…" : ""}
-            </p>
+            <div className="max-h-64 overflow-y-auto">
+              <Markdown content={latestAdvice.content} />
+            </div>
           ) : (
             <div className="text-sm text-stone-500">
               <p>Совета пока нет.</p>
