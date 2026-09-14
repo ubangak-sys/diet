@@ -186,7 +186,7 @@ async function callLLMOnce(
           { role: "user", content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 1200,
+        max_tokens: 3000,
       }),
       signal: controller.signal,
     });

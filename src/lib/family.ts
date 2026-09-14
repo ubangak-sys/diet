@@ -52,6 +52,15 @@ export async function setFamilyRole(
   if (error) throw new Error(error.message);
 }
 
+export async function rotateInviteCode(): Promise<string> {
+  const code = generateInviteCode();
+  const { data, error } = await supabase.rpc("rotate_invite_code", {
+    new_code: code,
+  });
+  if (error) throw new Error(error.message);
+  return (data as string) || code;
+}
+
 export async function leaveFamily(): Promise<void> {
   const { error } = await supabase.rpc("leave_family");
   if (error) throw new Error(error.message);

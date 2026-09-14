@@ -15,6 +15,7 @@ import {
   joinFamily,
   leaveFamily,
   removeFamilyMember,
+  rotateInviteCode,
   setFamilyRole,
 } from "@/lib/family";
 
@@ -135,6 +136,22 @@ export default function FamilyPage() {
       setTimeout(() => setCopied(false), 1500);
     } catch {
       /* ignore */
+    }
+  }
+
+  async function handleRotateCode() {
+    if (!confirm("Сгенерировать новый код? Старый перестанет действовать.")) {
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      await rotateInviteCode();
+      await load();
+    } catch (err) {
+      setError(msg(err));
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -262,6 +279,15 @@ export default function FamilyPage() {
                 >
                   {copied ? "Скопировано" : "Копировать"}
                 </button>
+                {isOwner && (
+                  <button
+                    onClick={handleRotateCode}
+                    disabled={busy}
+                    className="btn-secondary !px-3 !py-1.5"
+                  >
+                    Обновить код
+                  </button>
+                )}
               </div>
             </div>
             <p className="mt-3 text-sm text-stone-500">

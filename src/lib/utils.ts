@@ -28,3 +28,13 @@ export function formatDateRu(date: string): string {
     year: "numeric",
   });
 }
+
+// Прибавить/отнять дни от даты YYYY-MM-DD (без проблем часовых поясов).
+export function addDays(date: string, delta: number): string {
+  const [y, m, d] = date.split("-").map(Number);
+  const dt = new Date(y, m - 1, d + delta);
+  const yy = dt.getFullYear();
+  const mm = String(dt.getMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}

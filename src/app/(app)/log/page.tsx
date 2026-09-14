@@ -11,7 +11,7 @@ import {
   MealType,
   mealTypeLabel,
 } from "@/lib/types";
-import { formatDateRu, todayLocal } from "@/lib/utils";
+import { addDays, formatDateRu, todayLocal } from "@/lib/utils";
 
 export default function LogPage() {
   const { user } = useAuth();
@@ -20,6 +20,8 @@ export default function LogPage() {
   const [entries, setEntries] = useState<MealEntry[]>([]);
   const [loading, setLoading] = useState(false);
 
+  const [recentDishes, setRecentDishes] = useState<string[]>([]);
+
   const [mealType, setMealType] = useState<MealType>("breakfast");
   const [forUserId, setForUserId] = useState("");
   const [dishName, setDishName] = useState("");
@@ -27,8 +29,11 @@ export default function LogPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  const isOwner = family?.owner_id === user?.id;
   const members = family?.members ?? [];
+  const me = members.find((m) => m.user_id === user?.id);
+  const isParent = me?.member_role === "mom" || me?.member_role === "dad";
+  const kids = members.filter((m) => m.member_role === "kid");
+  const kidsSet = new Set(kids.map((k) => k.user_id));
 
   const loadFamily = useCallback(async () => {
     try {
@@ -59,8 +64,29 @@ export default function LogPage() {
     setLoading(false);
   }
 
+  async function loadRecentDishes() {
+    if (!user) return;
+    const { data } = await supabase
+      .from("meal_entries")
+      .select("dish_name, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200);
+    const seen = new Set<string>();
+    const dishes: string[] = [];
+    for (const e of data ?? []) {
+      const n = String(e.dish_name ?? "").trim();
+      if (n && !seen.has(n)) {
+        seen.add(n);
+        dishes.push(n);
+      }
+      if (dishes.length >= 8) break;
+    }
+    setRecentDishes(dishes);
+  }
+
   useEffect(() => {
     loadEntries();
+    loadRecentDishes();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, date]);
 
@@ -71,7 +97,7 @@ export default function LogPage() {
   }
 
   function canDelete(e: MealEntry): boolean {
-    return e.user_id === user?.id || !!isOwner;
+    return e.user_id === user?.id || (isParent && kidsSet.has(e.user_id));
   }
 
   async function addEntry(e: React.FormEvent) {
@@ -79,7 +105,7 @@ export default function LogPage() {
     if (!dishName.trim()) return;
     setSaving(true);
     setError("");
-    const target = isOwner && members.length > 1 ? forUserId : user!.id;
+    const target = isParent && kids.length > 0 ? forUserId : user!.id;
     const { error } = await supabase.from("meal_entries").insert({
       user_id: target,
       entry_date: date,
@@ -95,10 +121,43 @@ export default function LogPage() {
     setDishName("");
     setNotes("");
     await loadEntries();
+    await loadRecentDishes();
   }
 
   async function removeEntry(id: string) {
     await supabase.from("meal_entries").delete().eq("id", id);
+    await loadEntries();
+  }
+
+  async function copyPreviousDay() {
+    if (!user) return;
+    const prev = addDays(date, -1);
+    const { data } = await supabase
+      .from("meal_entries")
+      .select("*")
+      .eq("entry_date", prev);
+    const items = (data ?? []).filter(
+      (e) => e.user_id === user.id || (isParent && kidsSet.has(e.user_id)),
+    );
+    if (items.length === 0) {
+      setError("В предыдущий день нет записей, доступных для копирования.");
+      return;
+    }
+    setSaving(true);
+    setError("");
+    const rows = items.map((e) => ({
+      user_id: e.user_id,
+      entry_date: date,
+      meal_type: e.meal_type,
+      dish_name: e.dish_name,
+      notes: e.notes,
+    }));
+    const { error } = await supabase.from("meal_entries").insert(rows);
+    setSaving(false);
+    if (error) {
+      setError(error.message);
+      return;
+    }
     await loadEntries();
   }
 
@@ -113,19 +172,30 @@ export default function LogPage() {
               : "Фиксируйте, что вы ели, по приёмам пищи."}
           </p>
         </div>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="input w-auto"
-        />
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={copyPreviousDay}
+            disabled={saving}
+            className="btn-secondary !px-3 !py-1.5"
+            title="Скопировать записи предыдущего дня"
+          >
+            📋 Скопировать предыдущий день
+          </button>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="input w-auto"
+          />
+        </div>
       </div>
 
       <div className="grid gap-6 lg:grid-cols-5">
         <form onSubmit={addEntry} className="card space-y-4 lg:col-span-2">
           <h2 className="font-semibold">Добавить приём пищи</h2>
 
-          {isOwner && members.length > 1 && (
+          {isParent && kids.length > 0 && (
             <div>
               <label htmlFor="forUserId" className="label">
                 Для кого
@@ -137,13 +207,11 @@ export default function LogPage() {
                 onChange={(e) => setForUserId(e.target.value)}
               >
                 <option value={user!.id}>Вы</option>
-                {members
-                  .filter((m) => m.user_id !== user!.id)
-                  .map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.full_name || m.email || "Участник"}
-                    </option>
-                  ))}
+                {kids.map((m) => (
+                  <option key={m.user_id} value={m.user_id}>
+                    {m.full_name || m.email || "Ребёнок"}
+                  </option>
+                ))}
               </select>
             </div>
           )}
@@ -181,6 +249,20 @@ export default function LogPage() {
               onChange={(e) => setDishName(e.target.value)}
               placeholder="Например: овсянка с ягодами"
             />
+            {recentDishes.length > 0 && (
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {recentDishes.map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => setDishName(d)}
+                    className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs text-stone-600 hover:border-brand-500 hover:bg-brand-50"
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div>
