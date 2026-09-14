@@ -1,0 +1,6 @@
+project_id = "diet-expander"
+
+[functions.ai-advice]
+# verify_jwt = true (по умолчанию): функция принимает только запросы с валидным
+# пользовательским JWT Supabase. Клиент передаёт его автоматически.
+verify_jwt = true
