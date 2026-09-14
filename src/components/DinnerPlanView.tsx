@@ -1,10 +1,16 @@
 "use client";
 
 import { useState } from "react";
+import { useAuth } from "./AuthProvider";
+import { supabase } from "@/lib/supabase";
 import type { DinnerPlan } from "@/lib/types";
 
 export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
+  const { user } = useAuth();
   const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [verdicts, setVerdicts] = useState<Record<number, "liked" | "disliked">>(
+    {},
+  );
 
   function toggle(i: number) {
     setChecked((prev) => {
@@ -12,6 +18,16 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
       if (next.has(i)) next.delete(i);
       else next.add(i);
       return next;
+    });
+  }
+
+  async function mark(i: number, dish: string, verdict: "liked" | "disliked") {
+    if (!user) return;
+    setVerdicts((prev) => ({ ...prev, [i]: verdict }));
+    await supabase.from("tried_foods").insert({
+      user_id: user.id,
+      dish,
+      verdict,
     });
   }
 
@@ -23,15 +39,49 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
           <ul className="space-y-2">
             {plan.dinners.map((d, i) => (
               <li key={i} className="rounded-lg bg-stone-50 px-3 py-2">
-                <div className="text-sm font-medium">
-                  {d.day != null && (
-                    <span className="mr-1 text-stone-400">День {d.day}.</span>
-                  )}
-                  {d.title}
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-medium">
+                      {d.day != null && (
+                        <span className="mr-1 text-stone-400">
+                          День {d.day}.
+                        </span>
+                      )}
+                      {d.title}
+                    </div>
+                    {d.why && (
+                      <div className="mt-0.5 text-xs text-stone-500">
+                        {d.why}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => mark(i, d.title, "liked")}
+                      className={`rounded-full px-2 py-0.5 text-sm transition ${
+                        verdicts[i] === "liked"
+                          ? "bg-brand-600 text-white"
+                          : "bg-white text-stone-500 hover:bg-stone-200"
+                      }`}
+                      title="Зашло"
+                    >
+                      👍
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => mark(i, d.title, "disliked")}
+                      className={`rounded-full px-2 py-0.5 text-sm transition ${
+                        verdicts[i] === "disliked"
+                          ? "bg-red-600 text-white"
+                          : "bg-white text-stone-500 hover:bg-stone-200"
+                      }`}
+                      title="Не зашло"
+                    >
+                      👎
+                    </button>
+                  </div>
                 </div>
-                {d.why && (
-                  <div className="mt-0.5 text-xs text-stone-500">{d.why}</div>
-                )}
               </li>
             ))}
           </ul>

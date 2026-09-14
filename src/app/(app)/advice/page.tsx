@@ -9,6 +9,7 @@ import { DailyAdvice, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
 import { DinnerPlanView } from "@/components/DinnerPlanView";
+import { TriedFoods } from "@/components/TriedFoods";
 import { extractError } from "@/lib/edge-errors";
 
 type Tab = "personal" | "dinner";
@@ -235,6 +236,11 @@ export default function AdvicePage() {
           ))}
         </div>
       )}
+
+      <section className="card">
+        <h2 className="mb-3 font-semibold">История новинок 🧪</h2>
+        <TriedFoods />
+      </section>
     </div>
   );
 }
