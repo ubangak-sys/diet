@@ -19,13 +19,27 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen">
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="text-xl">🥗</span>
-            <span className="text-lg font-bold text-brand-700">Рацион+</span>
-          </Link>
+        <div className="mx-auto max-w-5xl px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <Link href="/" className="flex items-center gap-2">
+              <span className="text-xl">🥗</span>
+              <span className="text-lg font-bold text-brand-700">Рацион+</span>
+            </Link>
 
-          <nav className="flex items-center gap-1 overflow-x-auto">
+            <div className="flex items-center gap-3">
+              <span className="hidden text-sm text-stone-500 md:inline">
+                {user?.email}
+              </span>
+              <button
+                onClick={() => signOut()}
+                className="btn-secondary !px-3 !py-1.5"
+              >
+                Выйти
+              </button>
+            </div>
+          </div>
+
+          <nav className="mt-3 flex flex-wrap items-center gap-1">
             {NAV.map((item) => {
               const active =
                 item.href === "/"
@@ -47,15 +61,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               );
             })}
           </nav>
-
-          <div className="flex items-center gap-3">
-            <span className="hidden text-sm text-stone-500 sm:inline">
-              {user?.email}
-            </span>
-            <button onClick={() => signOut()} className="btn-secondary !px-3 !py-1.5">
-              Выйти
-            </button>
-          </div>
         </div>
       </header>
 
