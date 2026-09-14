@@ -53,6 +53,9 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 
 type Row = Record<string, unknown>;
 
+// Минимальный интервал между генерациями одного совета (защита от спама кнопкой «Обновить»)
+const MIN_INTERVAL_MS = Number(Deno.env.get("AI_MIN_INTERVAL_MS") || "300000");
+
 function buildPersonalPrompt(
   prefs: Row | null,
   meals: Row[],
@@ -247,6 +250,20 @@ async function personalAdvice(
   userId: string,
   date: string,
 ): Promise<Row> {
+  const recent = await db
+    .from("daily_advice")
+    .select("*")
+    .eq("user_id", userId)
+    .eq("advice_date", date)
+    .maybeSingle();
+  if (
+    recent.data &&
+    Date.now() - new Date(recent.data.created_at as string).getTime() <
+      MIN_INTERVAL_MS
+  ) {
+    return recent.data;
+  }
+
   const [prefsRes, mealsRes] = await Promise.all([
     db.from("preferences").select("*").eq("user_id", userId).maybeSingle(),
     db
@@ -287,6 +304,20 @@ async function dinnerAdvice(
     throw new Error("Вы не состоите в семье");
   }
   const familyId = myMembership.family_id as string;
+
+  const recent = await db
+    .from("family_advice")
+    .select("*")
+    .eq("family_id", familyId)
+    .eq("advice_date", date)
+    .maybeSingle();
+  if (
+    recent.data &&
+    Date.now() - new Date(recent.data.created_at as string).getTime() <
+      MIN_INTERVAL_MS
+  ) {
+    return recent.data;
+  }
 
   const [{ data: familyRow }, { data: memberRows }] = await Promise.all([
     db.from("families").select("name").eq("id", familyId).single(),

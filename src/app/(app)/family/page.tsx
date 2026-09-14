@@ -138,10 +138,6 @@ export default function FamilyPage() {
     }
   }
 
-  function canEditRole(userId: string): boolean {
-    return !!isOwner || userId === user?.id;
-  }
-
   if (loading) {
     return <p className="text-stone-500">Загрузка…</p>;
   }
@@ -302,7 +298,7 @@ export default function FamilyPage() {
                       {m.role === "owner" ? "Владелец" : "Участник"}
                     </span>
 
-                    {canEditRole(m.user_id) ? (
+                    {isOwner ? (
                       <select
                         className="input !w-auto !py-1 text-sm"
                         value={m.member_role}

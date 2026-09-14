@@ -70,6 +70,29 @@ Deno.serve(async (req) => {
   }
 
   const db = createClient(supabaseUrl, serviceKey);
+
+  // Rate limit: не больше 5 сообщений в час на пользователя/email
+  const since = new Date(Date.now() - 3600000).toISOString();
+  let recentCount = 0;
+  if (userId) {
+    const { count } = await db
+      .from("feedback")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .gte("created_at", since);
+    recentCount = count ?? 0;
+  } else if (email) {
+    const { count } = await db
+      .from("feedback")
+      .select("*", { count: "exact", head: true })
+      .eq("email", email)
+      .gte("created_at", since);
+    recentCount = count ?? 0;
+  }
+  if (recentCount >= 5) {
+    return json({ error: "Слишком много сообщений, попробуйте позже" }, 429);
+  }
+
   const { error: insertErr } = await db.from("feedback").insert({
     user_id: userId,
     name: name || null,
