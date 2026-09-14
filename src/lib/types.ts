@@ -108,6 +108,7 @@ export interface DinnerPlanItem {
 export interface ShoppingItem {
   item: string;
   amount?: string;
+  checked?: boolean;
 }
 
 export interface LunchboxItem {

@@ -197,7 +197,7 @@ export default function DashboardPage() {
         ) : dinner ? (
           <div className="mt-3 max-h-96 overflow-y-auto">
             {dinner.plan ? (
-              <DinnerPlanView plan={dinner.plan} />
+              <DinnerPlanView plan={dinner.plan} adviceId={dinner.id} />
             ) : (
               <Markdown content={dinner.content} />
             )}

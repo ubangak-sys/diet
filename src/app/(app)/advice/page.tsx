@@ -228,7 +228,7 @@ export default function AdvicePage() {
                 )}
               </div>
               {"plan" in a && a.plan ? (
-                <DinnerPlanView plan={a.plan} />
+                <DinnerPlanView plan={a.plan} adviceId={a.id} />
               ) : (
                 <Markdown content={a.content} />
               )}

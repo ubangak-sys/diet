@@ -95,6 +95,7 @@ interface DinnerPlanItem {
 interface ShoppingItem {
   item: string;
   amount?: string;
+  checked?: boolean;
 }
 interface LunchboxItem {
   for: string;
@@ -147,6 +148,7 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
           return {
             item: String(o.item ?? o.name ?? "").trim(),
             amount: o.amount != null ? String(o.amount) : undefined,
+            checked: o.checked === true,
           };
         })
         .filter((x) => x.item);

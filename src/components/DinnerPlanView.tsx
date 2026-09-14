@@ -5,20 +5,38 @@ import { useAuth } from "./AuthProvider";
 import { supabase } from "@/lib/supabase";
 import type { DinnerPlan } from "@/lib/types";
 
-export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
+export function DinnerPlanView({
+  plan,
+  adviceId,
+}: {
+  plan: DinnerPlan;
+  adviceId?: string;
+}) {
   const { user } = useAuth();
-  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [checked, setChecked] = useState<Set<number>>(() => {
+    const s = new Set<number>();
+    plan.shopping.forEach((item, i) => {
+      if (item.checked) s.add(i);
+    });
+    return s;
+  });
   const [verdicts, setVerdicts] = useState<Record<number, "liked" | "disliked">>(
     {},
   );
 
-  function toggle(i: number) {
+  async function toggle(i: number) {
     setChecked((prev) => {
       const next = new Set(prev);
       if (next.has(i)) next.delete(i);
       else next.add(i);
       return next;
     });
+    if (adviceId) {
+      await supabase.rpc("toggle_shopping_item", {
+        p_advice: adviceId,
+        p_index: i,
+      });
+    }
   }
 
   async function mark(i: number, dish: string, verdict: "liked" | "disliked") {
