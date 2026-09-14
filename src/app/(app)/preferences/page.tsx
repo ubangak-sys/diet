@@ -16,6 +16,7 @@ const EMPTY: Preferences = {
   dietary_restrictions: [],
   goal: null,
   notes: null,
+  dinner_wishes: [],
   updated_at: "",
 };
 
@@ -35,6 +36,7 @@ export default function PreferencesPage() {
   const [restrictions, setRestrictions] = useState<string[]>([]);
   const [goal, setGoal] = useState("");
   const [notes, setNotes] = useState("");
+  const [dinnerWishes, setDinnerWishes] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -89,6 +91,7 @@ export default function PreferencesPage() {
       setRestrictions(p.dietary_restrictions ?? []);
       setGoal(p.goal ?? "");
       setNotes(p.notes ?? "");
+      setDinnerWishes(arrayToText(p.dinner_wishes ?? []));
       setLoading(false);
     });
   }, [selectedUserId]);
@@ -126,6 +129,7 @@ export default function PreferencesPage() {
         dietary_restrictions: restrictions,
         goal: goal.trim() || null,
         notes: notes.trim() || null,
+        dinner_wishes: textToArray(dinnerWishes),
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" },
@@ -326,6 +330,23 @@ export default function PreferencesPage() {
                 placeholder="Режим дня, тренировки, бюджет…"
               />
             </div>
+          </div>
+
+          <div className="mt-4">
+            <label htmlFor="dinnerWishes" className="label">
+              Пожелания по ужину 🍽️
+            </label>
+            <textarea
+              id="dinnerWishes"
+              className="input min-h-[80px]"
+              value={dinnerWishes}
+              onChange={(e) => setDinnerWishes(e.target.value)}
+              placeholder={"Рыба почаще, без острого\nПопробовать что-то новое"}
+            />
+            <p className="mt-1 text-xs text-stone-400">
+              Учитываются в рекомендации по ужину. Приоритет ниже аллергий и
+              ограничений.
+            </p>
           </div>
         </div>
 

@@ -8,7 +8,7 @@
 //   AI_BASE_URL   — базовый URL API, по умолчанию https://api.deepseek.com
 //   AI_MODEL      — модель, по умолчанию deepseek-chat
 //
-// Тело запроса: { date?: "YYYY-MM-DD", mode?: "personal" | "dinner" }
+// Тело запроса: { date?: "YYYY-MM-DD", mode?: "personal" | "dinner", target_user_id?: string }
 // ============================================================================
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -47,7 +47,8 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 4. Предложи ужин для всей семьи. Если предпочтения сильно расходятся — дай 2–3 варианта блюд (не больше трёх), чтобы угодить всем.
 5. Для каждого блюда кратко укажи, почему оно подходит и кому.
 6. Обязательно добавь раздел «Купить» — список ингредиентов с количеством (что и сколько), рассчитанный на число членов семьи.
-7. Оформи структурированно и с эмодзи.`;
+7. Оформи структурированно и с эмодзи.
+8. «Пожелания по ужину» участников — мягкие пожелания: учитывай их, когда это возможно, но приоритет всегда у совместимости (аллергии/ограничения — жёсткий запрет) и общих вкусов.`;
 
 type Row = Record<string, unknown>;
 
@@ -122,11 +123,12 @@ function buildDinnerPrompt(
       const liked = arr(m.prefs?.liked_dishes).join(", ") || "не указано";
       const disliked = arr(m.prefs?.disliked_dishes).join(", ") || "не указано";
       const cuisines = arr(m.prefs?.cuisines).join(", ") || "не указаны";
+      const wishes = arr(m.prefs?.dinner_wishes).join(", ") || "нет";
       const meals =
         m.meals
           .map((x) => `- ${String(x.entry_date ?? "")} [${String(x.meal_type ?? "")}]: ${String(x.dish_name ?? "")}`)
           .join("\n") || "нет записей";
-      return `### ${m.name} (${roleLabel}, ${ageStr})\nЛюбит: ${liked}\nНе любит: ${disliked}\nКухни: ${cuisines}\nЕл(а) недавно:\n${meals}`;
+      return `### ${m.name} (${roleLabel}, ${ageStr})\nЛюбит: ${liked}\nНе любит: ${disliked}\nКухни: ${cuisines}\nПожелания по ужину: ${wishes}\nЕл(а) недавно:\n${meals}`;
     })
     .join("\n\n");
 
@@ -140,7 +142,7 @@ function buildDinnerPrompt(
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}
 
-Составь рекомендацию по общему семейному ужину: что приготовить (при сильных расхождениях во вкусах — до 2–3 вариантов блюд) и обязательный список покупок — какие ингредиенты и в каком количестве нужны.`;
+Составь рекомендацию по общему семейному ужину: что приготовить (при сильных расхождениях во вкусах — до 2–3 вариантов блюд) и обязательный список покупок — какие ингредиенты и в каком количестве нужны. Учти «Пожелания по ужину» участников, но они вторичны по отношению к совместимости.`;
 }
 
 async function callLLM(system: string, prompt: string): Promise<string> {
@@ -289,6 +291,32 @@ async function dinnerAdvice(
   return data;
 }
 
+async function canManageChild(
+  db: ReturnType<typeof createClient>,
+  actorId: string,
+  targetId: string,
+): Promise<boolean> {
+  const [{ data: actor }, { data: target }] = await Promise.all([
+    db
+      .from("family_members")
+      .select("family_id, member_role")
+      .eq("user_id", actorId)
+      .maybeSingle(),
+    db
+      .from("family_members")
+      .select("family_id, member_role")
+      .eq("user_id", targetId)
+      .maybeSingle(),
+  ]);
+  return !!(
+    actor &&
+    target &&
+    actor.family_id === target.family_id &&
+    (actor.member_role === "mom" || actor.member_role === "dad") &&
+    target.member_role === "kid"
+  );
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -323,21 +351,35 @@ Deno.serve(async (req) => {
   // Дата (локальная дата пользователя в формате YYYY-MM-DD)
   let date = new Date().toISOString().slice(0, 10);
   let mode: "personal" | "dinner" = "personal";
+  let targetUserId: string | null = null;
   try {
     const body = await req.json();
     if (body?.date && typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
       date = body.date;
     }
     if (body?.mode === "dinner") mode = "dinner";
+    if (
+      body?.target_user_id &&
+      typeof body.target_user_id === "string" &&
+      body.target_user_id !== user.id
+    ) {
+      targetUserId = body.target_user_id;
+    }
   } catch (_) {
     // тело не обязательно
   }
 
   try {
+    if (mode === "personal" && targetUserId) {
+      const ok = await canManageChild(db, user.id, targetUserId);
+      if (!ok) {
+        return json({ error: "Нет доступа к советам этого пользователя" }, 403);
+      }
+    }
     const advice =
       mode === "dinner"
         ? await dinnerAdvice(db, user.id, date)
-        : await personalAdvice(db, user.id, date);
+        : await personalAdvice(db, targetUserId ?? user.id, date);
     return json({ advice, mode });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Unknown error";

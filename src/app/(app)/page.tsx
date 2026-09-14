@@ -144,17 +144,25 @@ export default function DashboardPage() {
             </p>
           </div>
           {family && (
-            <button
-              onClick={generateDinner}
-              disabled={generatingDinner}
-              className="btn-primary"
-            >
-              {generatingDinner
-                ? "ИИ думает…"
-                : dinner?.advice_date === today
-                  ? "Обновить"
-                  : "Получить рекомендацию"}
-            </button>
+            <div className="flex items-center gap-3">
+              <Link
+                href="/preferences"
+                className="text-xs text-stone-400 underline hover:text-stone-600"
+              >
+                ✏️ Пожелания по ужину
+              </Link>
+              <button
+                onClick={generateDinner}
+                disabled={generatingDinner}
+                className="btn-primary"
+              >
+                {generatingDinner
+                  ? "ИИ думает…"
+                  : dinner?.advice_date === today
+                    ? "Обновить"
+                    : "Получить рекомендацию"}
+              </button>
+            </div>
           )}
         </div>
 

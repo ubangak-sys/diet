@@ -17,6 +17,7 @@ export interface Preferences {
   dietary_restrictions: string[];
   goal: string | null;
   notes: string | null;
+  dinner_wishes: string[];
   updated_at: string;
 }
 

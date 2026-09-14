@@ -32,6 +32,7 @@ export default function AdvicePage() {
   const [family, setFamily] = useState<Family | null>(null);
   const [tab, setTab] = useState<Tab>("personal");
 
+  const [selectedUserId, setSelectedUserId] = useState("");
   const [personal, setPersonal] = useState<DailyAdvice[]>([]);
   const [dinnerAdvice, setDinnerAdvice] = useState<FamilyAdvice[]>([]);
 
@@ -39,15 +40,20 @@ export default function AdvicePage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const members = family?.members ?? [];
+  const me = members.find((m) => m.user_id === user?.id);
+  const isParent = me?.member_role === "mom" || me?.member_role === "dad";
+  const kids = members.filter((m) => m.member_role === "kid");
+
   const loadPersonal = useCallback(async () => {
-    if (!user) return;
+    if (!selectedUserId) return;
     const { data } = await supabase
       .from("daily_advice")
       .select("*")
-      .eq("user_id", user.id)
+      .eq("user_id", selectedUserId)
       .order("advice_date", { ascending: false });
     setPersonal(data ?? []);
-  }, [user]);
+  }, [selectedUserId]);
 
   const loadDinnerAdvice = useCallback(async () => {
     if (!family) return;
@@ -67,9 +73,16 @@ export default function AdvicePage() {
       } catch {
         setFamily(null);
       }
-      await loadPersonal();
       setLoading(false);
     })();
+  }, []);
+
+  useEffect(() => {
+    if (user) setSelectedUserId(user.id);
+  }, [user]);
+
+  useEffect(() => {
+    loadPersonal();
   }, [loadPersonal]);
 
   useEffect(() => {
@@ -81,9 +94,14 @@ export default function AdvicePage() {
     setGenerating(true);
     setError("");
 
+    const body: Record<string, unknown> = { date: todayLocal(), mode };
+    if (mode === "personal" && selectedUserId !== user.id) {
+      body.target_user_id = selectedUserId;
+    }
+
     const { data, error: fnError } = await supabase.functions.invoke(
       "ai-advice",
-      { body: { date: todayLocal(), mode } },
+      { body },
     );
 
     setGenerating(false);
@@ -102,6 +120,7 @@ export default function AdvicePage() {
 
   const today = todayLocal();
   const currentList = tab === "dinner" ? dinnerAdvice : personal;
+  const selectedKid = kids.find((k) => k.user_id === selectedUserId);
 
   return (
     <div className="space-y-6">
@@ -140,6 +159,27 @@ export default function AdvicePage() {
         </div>
       )}
 
+      {tab === "personal" && isParent && kids.length > 0 && (
+        <div className="card">
+          <label htmlFor="adviceUser" className="label">
+            Чей личный совет показать
+          </label>
+          <select
+            id="adviceUser"
+            className="input"
+            value={selectedUserId}
+            onChange={(e) => setSelectedUserId(e.target.value)}
+          >
+            <option value={user!.id}>Мои (вы)</option>
+            {kids.map((k) => (
+              <option key={k.user_id} value={k.user_id}>
+                {k.full_name || k.email || "Ребёнок"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {tab === "dinner" && !family && (
         <div className="card text-center text-stone-500">
           <div className="text-4xl">🍽️</div>
@@ -158,7 +198,9 @@ export default function AdvicePage() {
           <p className="text-sm text-stone-500">
             {tab === "dinner"
               ? "Что приготовить на общий семейный ужин + список покупок."
-              : "Персональный совет с учётом ваших предпочтений и меню."}
+              : selectedKid
+                ? `Персональный совет для: ${selectedKid.full_name || "ребёнка"}.`
+                : "Персональный совет с учётом ваших предпочтений и меню."}
           </p>
           <button
             onClick={() => generate(tab)}

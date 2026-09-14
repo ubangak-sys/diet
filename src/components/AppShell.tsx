@@ -1,8 +1,10 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { FeedbackModal } from "./FeedbackModal";
 
 const NAV = [
   { href: "/", label: "Главная", emoji: "🏠" },
@@ -15,9 +17,10 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   const pathname = usePathname();
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
 
   return (
-    <div className="min-h-screen">
+    <div className="flex min-h-screen flex-col">
       <header className="sticky top-0 z-10 border-b border-stone-200 bg-white/90 backdrop-blur">
         <div className="mx-auto max-w-5xl px-4 py-3">
           <div className="flex items-center justify-between gap-3">
@@ -64,7 +67,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-6">{children}</main>
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
+        {children}
+      </main>
+
+      <footer className="border-t border-stone-200 py-6 text-center">
+        <button
+          onClick={() => setFeedbackOpen(true)}
+          className="text-xs text-stone-400 underline hover:text-stone-600"
+        >
+          Обратная связь · сообщить о пожелании
+        </button>
+      </footer>
+
+      <FeedbackModal open={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
     </div>
   );
 }
