@@ -67,12 +67,14 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
                         ⏱️ {d.time}
                       </div>
                     )}
-                    {d.cooking && (
+                    {d.steps && d.steps.length > 0 && (
                       <div className="mt-1 rounded-md bg-white px-2 py-1 text-xs text-stone-600">
-                        <span className="font-medium">
-                          👨‍🍳 Приготовление:
-                        </span>{" "}
-                        {d.cooking}
+                        <div className="font-medium">👨‍🍳 Приготовление:</div>
+                        <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                          {d.steps.map((s, j) => (
+                            <li key={j}>{s}</li>
+                          ))}
+                        </ol>
                       </div>
                     )}
                   </div>

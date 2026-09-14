@@ -102,7 +102,7 @@ export interface DinnerPlanItem {
   why?: string;
   variants?: string[];
   time?: string;
-  cooking?: string;
+  steps?: string[];
 }
 
 export interface ShoppingItem {

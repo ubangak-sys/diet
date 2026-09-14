@@ -50,7 +50,7 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
       "why": "почему подходит и кому",
       "variants": ["альтернативный вариант 2", "альтернативный вариант 3"],
       "time": "~40 минут",
-      "cooking": "подробная пошаговая инструкция приготовления (5–6 шагов, с ключевыми действиями)"
+      "steps": ["шаг 1", "шаг 2", "шаг 3", "шаг 4", "шаг 5"]
     },
     { "day": 2, "title": "Блюдо дня 2", "why": "почему подходит" },
     { "day": 3, "title": "Блюдо дня 3", "why": "почему подходит" }
@@ -72,7 +72,7 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет.
 3. Учитывай роль, возраст, вкусы и недавнее меню.
 4. Всего РОВНО 3 ужина (day 1, 2, 3).
-5. День 1 — самый подробный: 1 основное блюдо + 2 альтернативных варианта в "variants" + время в "time" + подробная инструкция в "cooking".
+5. День 1 — самый подробный: 1 основное блюдо + 2 альтернативных варианта в "variants" + время в "time" + пошаговая инструкция списком в "steps" (5–6 шагов).
 6. Дни 2 и 3 — коротко: только title и why.
 7. shopping — список покупок ТОЛЬКО для дня 1, с количеством.
 8. lunchboxes — только для школьников старше 7 лет; для каждого — items (что положить) и note (совет); если таких нет, верни пустой массив.
@@ -90,7 +90,7 @@ interface DinnerPlanItem {
   why?: string;
   variants?: string[];
   time?: string;
-  cooking?: string;
+  steps?: string[];
 }
 interface ShoppingItem {
   item: string;
@@ -121,13 +121,18 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
           const variants = Array.isArray(o.variants)
             ? o.variants.map((v) => String(v).trim()).filter(Boolean)
             : undefined;
+          const steps = Array.isArray(o.steps)
+            ? o.steps.map((v) => String(v).trim()).filter(Boolean)
+            : typeof o.cooking === "string" && o.cooking.trim()
+              ? o.cooking.trim().split(/\n+/).map((s) => s.trim()).filter(Boolean)
+              : undefined;
           return {
             day: o.day ?? o.number,
             title: String(o.title ?? o.dish ?? "").trim(),
             why: o.why != null ? String(o.why) : undefined,
             variants: variants && variants.length ? variants : undefined,
             time: o.time != null ? String(o.time) : undefined,
-            cooking: o.cooking != null ? String(o.cooking) : undefined,
+            steps: steps && steps.length ? steps : undefined,
           };
         })
         .filter((d) => d.title);
