@@ -62,11 +62,19 @@ export default function LogPage() {
     const dishes: string[] = [];
     for (const e of data ?? []) {
       const n = String(e.dish_name ?? "").trim();
-      if (n && !seen.has(n)) {
-        seen.add(n);
-        dishes.push(n);
+      // дробим блюдо на состав: по запятой, "/", "+", "с", "и", "или"
+      const parts = n
+        .split(/[,;+/]|\s+(?:с|со|и|или)\s+/gi)
+        .map((s) => s.trim())
+        .filter((s) => s.length > 1);
+      for (const part of parts) {
+        const key = part.toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          dishes.push(part);
+        }
       }
-      if (dishes.length >= 8) break;
+      if (dishes.length >= 15) break;
     }
     setRecentDishes(dishes);
   }
@@ -85,6 +93,22 @@ export default function LogPage() {
 
   function canDelete(e: MealEntry): boolean {
     return e.user_id === user?.id || (isParent && kidsSet.has(e.user_id));
+  }
+
+  function toggleChip(part: string) {
+    const current = dishName
+      .split(/,\s*/)
+      .map((s) => s.trim())
+      .filter(Boolean);
+    const idx = current.findIndex(
+      (c) => c.toLowerCase() === part.toLowerCase(),
+    );
+    if (idx >= 0) {
+      current.splice(idx, 1);
+    } else {
+      current.push(part);
+    }
+    setDishName(current.join(", "));
   }
 
   async function addEntry(e: React.FormEvent) {
@@ -238,16 +262,26 @@ export default function LogPage() {
             />
             {recentDishes.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
-                {recentDishes.map((d) => (
-                  <button
-                    key={d}
-                    type="button"
-                    onClick={() => setDishName(d)}
-                    className="rounded-full border border-stone-200 bg-stone-50 px-2.5 py-1 text-xs text-stone-600 hover:border-brand-500 hover:bg-brand-50"
-                  >
-                    {d}
-                  </button>
-                ))}
+                {recentDishes.map((d) => {
+                  const active = dishName
+                    .split(/,\s*/)
+                    .some((c) => c.toLowerCase() === d.toLowerCase());
+                  return (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => toggleChip(d)}
+                      className={`rounded-full border px-2.5 py-1 text-xs transition ${
+                        active
+                          ? "border-brand-500 bg-brand-50 text-brand-700"
+                          : "border-stone-200 bg-stone-50 text-stone-600 hover:border-brand-500 hover:bg-brand-50"
+                      }`}
+                    >
+                      {active ? "✓ " : ""}
+                      {d}
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
