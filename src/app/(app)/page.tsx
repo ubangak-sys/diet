@@ -15,6 +15,7 @@ import {
 } from "@/lib/types";
 import { todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
+import { DinnerPlanView } from "@/components/DinnerPlanView";
 import { extractError } from "@/lib/edge-errors";
 
 export default function DashboardPage() {
@@ -106,6 +107,11 @@ export default function DashboardPage() {
   }
 
   const name = profile?.full_name || user?.email?.split("@")[0] || "друг";
+  const missingAge = family?.members.filter((m) => m.age == null) ?? [];
+  const hasParent =
+    family?.members.some(
+      (m) => m.member_role === "mom" || m.member_role === "dad",
+    ) ?? false;
 
   return (
     <div className="space-y-6">
@@ -151,6 +157,27 @@ export default function DashboardPage() {
           )}
         </div>
 
+        {family && (missingAge.length > 0 || !hasParent) && (
+          <div className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+            <p className="font-medium">⚠️ Не хватает данных для точного ужина:</p>
+            <ul className="mt-1 list-inside list-disc space-y-0.5">
+              {missingAge.length > 0 && (
+                <li>
+                  не указан возраст —{" "}
+                  {missingAge.map((m) => m.full_name || "участник").join(", ")}
+                </li>
+              )}
+              {!hasParent && <li>в семье нет роли «мама» или «папа»</li>}
+            </ul>
+            <p className="mt-1">
+              Заполните профили и предпочтения/аллергии на странице{" "}
+              <Link href="/preferences" className="font-medium underline">
+                «Профиль и предпочтения» →
+              </Link>
+            </p>
+          </div>
+        )}
+
         {dinnerError && (
           <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
             {dinnerError}
@@ -173,7 +200,11 @@ export default function DashboardPage() {
           </div>
         ) : dinner ? (
           <div className="mt-3 max-h-96 overflow-y-auto">
-            <Markdown content={dinner.content} />
+            {dinner.plan ? (
+              <DinnerPlanView plan={dinner.plan} />
+            ) : (
+              <Markdown content={dinner.content} />
+            )}
           </div>
         ) : (
           <p className="mt-3 text-sm text-stone-500">

@@ -96,10 +96,33 @@ export interface Family {
   members: FamilyMember[];
 }
 
+export interface DinnerPlanItem {
+  day?: number | string;
+  title: string;
+  why?: string;
+}
+
+export interface ShoppingItem {
+  item: string;
+  amount?: string;
+}
+
+export interface LunchboxItem {
+  for: string;
+  note?: string;
+}
+
+export interface DinnerPlan {
+  dinners: DinnerPlanItem[];
+  shopping: ShoppingItem[];
+  lunchboxes: LunchboxItem[];
+}
+
 export interface FamilyAdvice {
   id: string;
   family_id: string;
   advice_date: string;
   content: string;
+  plan: DinnerPlan | null;
   created_at: string;
 }

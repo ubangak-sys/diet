@@ -8,6 +8,7 @@ import { getMyFamily } from "@/lib/family";
 import { DailyAdvice, Family, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
+import { DinnerPlanView } from "@/components/DinnerPlanView";
 import { extractError } from "@/lib/edge-errors";
 
 type Tab = "personal" | "dinner";
@@ -237,7 +238,11 @@ export default function AdvicePage() {
                   </span>
                 )}
               </div>
-              <Markdown content={a.content} />
+              {"plan" in a && a.plan ? (
+                <DinnerPlanView plan={a.plan} />
+              ) : (
+                <Markdown content={a.content} />
+              )}
             </article>
           ))}
         </div>

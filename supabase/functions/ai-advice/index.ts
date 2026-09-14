@@ -38,23 +38,111 @@ const SYSTEM_PROMPT = `Ты — персональный нутрициолог.
 6. Будь конкретным, но кратким. Не давай медицинских диагнозов и не назначай лечение.
 7. Оформи ответ как структурированный список с эмодзи.`;
 
-const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь рекомендацию по общему семейному УЖИНУ.
+const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь ПЛАН ужинов на 3–7 дней для всей семьи.
 
-Правила ответа:
-1. Отвечай на русском языке.
-2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет: блюда должны подходить всем без исключения.
-3. Учитывай роль и возраст каждого (мама/папа/дети), вкусы и то, что семья недавно ела.
-4. Предложи ужин для всей семьи. Если предпочтения сильно расходятся — дай 2–3 варианта блюд (не больше трёх), чтобы угодить всем.
-5. Для каждого блюда кратко укажи, почему оно подходит и кому.
-6. Обязательно добавь раздел «Купить» — список ингредиентов с количеством (что и сколько), рассчитанный на число членов семьи.
-7. Оформи структурированно и с эмодзи.
-8. «Пожелания по ужину» участников — мягкие пожелания: учитывай их, когда это возможно, но приоритет всегда у совместимости (аллергии/ограничения — жёсткий запрет) и общих вкусов.
-9. Если среди детей есть школьники (старше 7 лет), добавь раздел «🍱 Ланчбокс на завтра»: для каждого такого ребёнка — что положить (сытно, не требует разогрева, не портится до обеда), с учётом его аллергий и вкусов. Если школьников старше 7 лет нет — раздел не добавляй.`;
+Ответ верни СТРОГО как JSON-объект (без markdown и пояснений вокруг) в таком формате:
+{
+  "dinners": [
+    { "day": 1, "title": "Название блюда", "why": "почему подходит и кому" }
+  ],
+  "shopping": [
+    { "item": "Ингредиент", "amount": "количество на все дни" }
+  ],
+  "lunchboxes": [
+    { "for": "Имя школьника", "note": "что положить с собой" }
+  ]
+}
+
+Правила:
+1. Отвечай на русском.
+2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет.
+3. Учитывай роль, возраст, вкусы и недавнее меню.
+4. dinners — 3–7 ужинов; если вкусы сильно расходятся, основной вариант в title, альтернативу — в why.
+5. shopping — единый список покупок на все дни, с количеством.
+6. lunchboxes — только для школьников старше 7 лет; если таких нет, верни пустой массив.
+7. «Пожелания по ужину» — мягкие, учитывай при возможности.`;
 
 type Row = Record<string, unknown>;
 
 // Минимальный интервал между генерациями одного совета (защита от спама кнопкой «Обновить»)
 const MIN_INTERVAL_MS = Number(Deno.env.get("AI_MIN_INTERVAL_MS") || "300000");
+
+interface DinnerPlanItem {
+  day?: number | string;
+  title: string;
+  why?: string;
+}
+interface ShoppingItem {
+  item: string;
+  amount?: string;
+}
+interface LunchboxItem {
+  for: string;
+  note?: string;
+}
+interface DinnerPlan {
+  dinners: DinnerPlanItem[];
+  shopping: ShoppingItem[];
+  lunchboxes: LunchboxItem[];
+}
+
+function parseDinnerPlan(text: string): DinnerPlan | null {
+  let s = text.trim();
+  const fence = s.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) s = fence[1].trim();
+
+  const tryParse = (str: string): DinnerPlan | null => {
+    try {
+      const raw = JSON.parse(str) as Record<string, unknown>;
+      const dinners = (Array.isArray(raw.dinners) ? raw.dinners : [])
+        .map((d) => {
+          const o = (d ?? {}) as Record<string, unknown>;
+          return {
+            day: o.day ?? o.number,
+            title: String(o.title ?? o.dish ?? "").trim(),
+            why: o.why != null ? String(o.why) : undefined,
+          };
+        })
+        .filter((d) => d.title);
+      const shoppingSrc = Array.isArray(raw.shopping)
+        ? raw.shopping
+        : Array.isArray(raw.shopping_list)
+          ? raw.shopping_list
+          : [];
+      const shopping = shoppingSrc
+        .map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return {
+            item: String(o.item ?? o.name ?? "").trim(),
+            amount: o.amount != null ? String(o.amount) : undefined,
+          };
+        })
+        .filter((x) => x.item);
+      const lunchboxes = (Array.isArray(raw.lunchboxes) ? raw.lunchboxes : [])
+        .map((x) => {
+          const o = (x ?? {}) as Record<string, unknown>;
+          return {
+            for: String(o.for ?? "").trim(),
+            note: o.note != null ? String(o.note) : undefined,
+          };
+        })
+        .filter((x) => x.for);
+      if (dinners.length === 0 && shopping.length === 0 && lunchboxes.length === 0) {
+        return null;
+      }
+      return { dinners, shopping, lunchboxes };
+    } catch {
+      return null;
+    }
+  };
+
+  const direct = tryParse(s);
+  if (direct) return direct;
+  const start = s.indexOf("{");
+  const end = s.lastIndexOf("}");
+  if (start >= 0 && end > start) return tryParse(s.slice(start, end + 1));
+  return null;
+}
 
 function buildPersonalPrompt(
   prefs: Row | null,
@@ -156,7 +244,7 @@ function buildDinnerPrompt(
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}${schoolSection}
 
-Составь рекомендацию по общему семейному ужину: что приготовить (при сильных расхождениях во вкусах — до 2–3 вариантов блюд) и обязательный список покупок — какие ингредиенты и в каком количестве нужны. Учти «Пожелания по ужину» участников, но они вторичны по отношению к совместимости.${schoolKids.length > 0 ? " Также добавь раздел «🍱 Ланчбокс на завтра» для каждого школьника." : ""}`;
+Составь JSON-план ужинов на 3–7 дней: dinners, единый shopping-список${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости.`;
 }
 
 async function callLLMOnce(
@@ -166,6 +254,8 @@ async function callLLMOnce(
   system: string,
   prompt: string,
   timeoutMs: number,
+  maxTokens: number,
+  json: boolean,
 ): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -186,7 +276,8 @@ async function callLLMOnce(
           { role: "user", content: prompt },
         ],
         temperature: 0.7,
-        max_tokens: 3000,
+        max_tokens: maxTokens,
+        ...(json ? { response_format: { type: "json_object" } } : {}),
       }),
       signal: controller.signal,
     });
@@ -210,13 +301,19 @@ async function callLLMOnce(
   }
 }
 
-async function callLLM(system: string, prompt: string): Promise<string> {
+async function callLLM(
+  system: string,
+  prompt: string,
+  opts?: { maxTokens?: number; json?: boolean },
+): Promise<string> {
   const baseUrl = Deno.env.get("AI_BASE_URL") || "https://api.deepseek.com";
   const apiKey = Deno.env.get("AI_API_KEY");
   const model = Deno.env.get("AI_MODEL") || "deepseek-chat";
   // Настройки: AI_TIMEOUT_MS — таймаут одной попытки (мс), AI_ATTEMPTS — число попыток
   const timeoutMs = Number(Deno.env.get("AI_TIMEOUT_MS") || "50000");
   const attempts = Number(Deno.env.get("AI_ATTEMPTS") || "2");
+  const maxTokens = opts?.maxTokens ?? 1600;
+  const json = opts?.json ?? false;
 
   if (!apiKey) {
     throw new Error(
@@ -227,7 +324,7 @@ async function callLLM(system: string, prompt: string): Promise<string> {
   let lastError: Error | null = null;
   for (let i = 0; i < attempts; i++) {
     try {
-      return await callLLMOnce(baseUrl, apiKey, model, system, prompt, timeoutMs);
+      return await callLLMOnce(baseUrl, apiKey, model, system, prompt, timeoutMs, maxTokens, json);
     } catch (e) {
       const err = e instanceof Error ? e : new Error(String(e));
       // Ошибки самого API (неверный ключ, нет баланса, неверная модель) не ретраим
@@ -365,12 +462,16 @@ async function dinnerAdvice(
   );
 
   const prompt = buildDinnerPrompt(familyName, members, date);
-  const content = await callLLM(DINNER_SYSTEM_PROMPT, prompt);
+  const content = await callLLM(DINNER_SYSTEM_PROMPT, prompt, {
+    maxTokens: 4000,
+    json: true,
+  });
+  const plan = parseDinnerPlan(content);
 
   const { data, error } = await db
     .from("family_advice")
     .upsert(
-      { family_id: familyId, advice_date: date, content },
+      { family_id: familyId, advice_date: date, content, plan: plan ?? null },
       { onConflict: "family_id,advice_date" },
     )
     .select()
