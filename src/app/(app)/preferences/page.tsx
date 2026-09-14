@@ -21,6 +21,9 @@ const EMPTY: Preferences = {
 export default function PreferencesPage() {
   const { user } = useAuth();
 
+  const [fullName, setFullName] = useState("");
+  const [age, setAge] = useState("");
+
   const [liked, setLiked] = useState("");
   const [disliked, setDisliked] = useState("");
   const [cuisines, setCuisines] = useState("");
@@ -35,22 +38,32 @@ export default function PreferencesPage() {
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("preferences")
-      .select("*")
-      .eq("user_id", user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        const p = (data ?? EMPTY) as Preferences;
-        setLiked(arrayToText(p.liked_dishes));
-        setDisliked(arrayToText(p.disliked_dishes));
-        setCuisines(arrayToText(p.cuisines));
-        setAllergies(arrayToText(p.allergies));
-        setRestrictions(p.dietary_restrictions ?? []);
-        setGoal(p.goal ?? "");
-        setNotes(p.notes ?? "");
-        setLoading(false);
-      });
+    Promise.all([
+      supabase
+        .from("profiles")
+        .select("full_name, age")
+        .eq("id", user.id)
+        .maybeSingle(),
+      supabase
+        .from("preferences")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle(),
+    ]).then(([profileRes, prefsRes]) => {
+      const prof = profileRes.data;
+      setFullName(prof?.full_name ?? "");
+      setAge(prof?.age != null ? String(prof.age) : "");
+
+      const p = (prefsRes.data ?? EMPTY) as Preferences;
+      setLiked(arrayToText(p.liked_dishes));
+      setDisliked(arrayToText(p.disliked_dishes));
+      setCuisines(arrayToText(p.cuisines));
+      setAllergies(arrayToText(p.allergies));
+      setRestrictions(p.dietary_restrictions ?? []);
+      setGoal(p.goal ?? "");
+      setNotes(p.notes ?? "");
+      setLoading(false);
+    });
   }, [user]);
 
   function toggleRestriction(opt: string) {
@@ -65,7 +78,14 @@ export default function PreferencesPage() {
     setSaving(true);
     setMessage("");
 
-    const { error } = await supabase.from("preferences").upsert(
+    const ageNum = age.trim() ? Number(age) : null;
+
+    const profileRes = await supabase
+      .from("profiles")
+      .update({ full_name: fullName.trim() || null, age: ageNum })
+      .eq("id", user.id);
+
+    const prefsRes = await supabase.from("preferences").upsert(
       {
         user_id: user.id,
         liked_dishes: textToArray(liked),
@@ -81,9 +101,13 @@ export default function PreferencesPage() {
     );
 
     setSaving(false);
-    setMessage(
-      error ? `Ошибка: ${error.message}` : "Сохранено ✅ ИИ учтёт это в советах.",
-    );
+    if (profileRes.error) {
+      setMessage(`Ошибка: ${profileRes.error.message}`);
+    } else if (prefsRes.error) {
+      setMessage(`Ошибка: ${prefsRes.error.message}`);
+    } else {
+      setMessage("Сохранено ✅ ИИ учтёт это в советах и рекомендациях.");
+    }
   }
 
   if (loading) {
@@ -93,120 +117,159 @@ export default function PreferencesPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-2xl font-bold">Предпочтения</h1>
+        <h1 className="text-2xl font-bold">Профиль и предпочтения</h1>
         <p className="text-stone-500">
-          Эти данные помогают ИИ предлагать подходящие новые блюда и не
-          предлагать неподходящие.
+          Эти данные помогают ИИ предлагать подходящие блюда и не предлагать
+          неподходящие.
         </p>
       </div>
 
       <form onSubmit={onSubmit} className="card space-y-5">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="liked" className="label">
-              Что вы любите 🥰
-            </label>
-            <textarea
-              id="liked"
-              className="input min-h-[90px]"
-              value={liked}
-              onChange={(e) => setLiked(e.target.value)}
-              placeholder={"Паста, курица, гречка\nСырники, яблоки"}
-            />
-            <p className="mt-1 text-xs text-stone-400">
-              Через запятую или с новой строки.
-            </p>
-          </div>
-          <div>
-            <label htmlFor="disliked" className="label">
-              Что не любите 🙅
-            </label>
-            <textarea
-              id="disliked"
-              className="input min-h-[90px]"
-              value={disliked}
-              onChange={(e) => setDisliked(e.target.value)}
-              placeholder={"Печень, кинза, сельдерей"}
-            />
+        <div>
+          <h2 className="mb-3 font-semibold">Профиль</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="fullName" className="label">
+                Имя
+              </label>
+              <input
+                id="fullName"
+                type="text"
+                className="input"
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Как к вам обращаться"
+              />
+            </div>
+            <div>
+              <label htmlFor="age" className="label">
+                Возраст
+              </label>
+              <input
+                id="age"
+                type="number"
+                min={1}
+                max={120}
+                className="input"
+                value={age}
+                onChange={(e) => setAge(e.target.value)}
+                placeholder="Например: 34"
+              />
+            </div>
           </div>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="cuisines" className="label">
-              Любимые кухни 🌍
-            </label>
-            <textarea
-              id="cuisines"
-              className="input min-h-[90px]"
-              value={cuisines}
-              onChange={(e) => setCuisines(e.target.value)}
-              placeholder={"Итальянская, грузинская\nАзиатская"}
-            />
-          </div>
-          <div>
-            <label htmlFor="allergies" className="label">
-              Аллергии / непереносимость ⚠️
-            </label>
-            <textarea
-              id="allergies"
-              className="input min-h-[90px]"
-              value={allergies}
-              onChange={(e) => setAllergies(e.target.value)}
-              placeholder={"Орехи, лактоза, морепродукты"}
-            />
-            <p className="mt-1 text-xs text-amber-600">
-              Это строгие запреты — ИИ никогда их не предложит.
-            </p>
-          </div>
-        </div>
+        <hr className="border-stone-200" />
 
         <div>
-          <span className="label">Ограничения в питании</span>
-          <div className="flex flex-wrap gap-2">
-            {DIETARY_OPTIONS.map((opt) => (
-              <button
-                key={opt}
-                type="button"
-                onClick={() => toggleRestriction(opt)}
-                className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
-                  restrictions.includes(opt)
-                    ? "border-brand-500 bg-brand-50 text-brand-700"
-                    : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
-                }`}
-              >
-                {opt}
-              </button>
-            ))}
+          <h2 className="mb-3 font-semibold">Предпочтения в еде</h2>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="liked" className="label">
+                Что вы любите 🥰
+              </label>
+              <textarea
+                id="liked"
+                className="input min-h-[90px]"
+                value={liked}
+                onChange={(e) => setLiked(e.target.value)}
+                placeholder={"Паста, курица, гречка\nСырники, яблоки"}
+              />
+              <p className="mt-1 text-xs text-stone-400">
+                Через запятую или с новой строки.
+              </p>
+            </div>
+            <div>
+              <label htmlFor="disliked" className="label">
+                Что не любите 🙅
+              </label>
+              <textarea
+                id="disliked"
+                className="input min-h-[90px]"
+                value={disliked}
+                onChange={(e) => setDisliked(e.target.value)}
+                placeholder={"Печень, кинза, сельдерей"}
+              />
+            </div>
           </div>
-        </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="goal" className="label">
-              Цель 🎯
-            </label>
-            <input
-              id="goal"
-              type="text"
-              className="input"
-              value={goal}
-              onChange={(e) => setGoal(e.target.value)}
-              placeholder="Например: больше белка, больше овощей"
-            />
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="cuisines" className="label">
+                Любимые кухни 🌍
+              </label>
+              <textarea
+                id="cuisines"
+                className="input min-h-[90px]"
+                value={cuisines}
+                onChange={(e) => setCuisines(e.target.value)}
+                placeholder={"Итальянская, грузинская\nАзиатская"}
+              />
+            </div>
+            <div>
+              <label htmlFor="allergies" className="label">
+                Аллергии / непереносимость ⚠️
+              </label>
+              <textarea
+                id="allergies"
+                className="input min-h-[90px]"
+                value={allergies}
+                onChange={(e) => setAllergies(e.target.value)}
+                placeholder={"Орехи, лактоза, морепродукты"}
+              />
+              <p className="mt-1 text-xs text-amber-600">
+                Это строгие запреты — ИИ никогда их не предложит.
+              </p>
+            </div>
           </div>
-          <div>
-            <label htmlFor="notes" className="label">
-              Дополнительные заметки 📌
-            </label>
-            <input
-              id="notes"
-              type="text"
-              className="input"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              placeholder="Режим дня, тренировки, бюджет…"
-            />
+
+          <div className="mt-4">
+            <span className="label">Ограничения в питании</span>
+            <div className="flex flex-wrap gap-2">
+              {DIETARY_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  type="button"
+                  onClick={() => toggleRestriction(opt)}
+                  className={`rounded-full border px-3 py-1.5 text-sm font-medium transition ${
+                    restrictions.includes(opt)
+                      ? "border-brand-500 bg-brand-50 text-brand-700"
+                      : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                  }`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-4 sm:grid-cols-2">
+            <div>
+              <label htmlFor="goal" className="label">
+                Цель 🎯
+              </label>
+              <input
+                id="goal"
+                type="text"
+                className="input"
+                value={goal}
+                onChange={(e) => setGoal(e.target.value)}
+                placeholder="Например: больше белка, больше овощей"
+              />
+            </div>
+            <div>
+              <label htmlFor="notes" className="label">
+                Дополнительные заметки 📌
+              </label>
+              <input
+                id="notes"
+                type="text"
+                className="input"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                placeholder="Режим дня, тренировки, бюджет…"
+              />
+            </div>
           </div>
         </div>
 
@@ -223,7 +286,7 @@ export default function PreferencesPage() {
         )}
 
         <button type="submit" disabled={saving} className="btn-primary">
-          {saving ? "Сохраняем…" : "Сохранить предпочтения"}
+          {saving ? "Сохраняем…" : "Сохранить"}
         </button>
       </form>
     </div>

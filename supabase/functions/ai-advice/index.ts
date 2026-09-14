@@ -1,6 +1,6 @@
 // ============================================================================
 // Supabase Edge Function «ai-advice»
-// Генерирует персональный или семейный ИИ-совет (DeepSeek, OpenAI-совместимый API).
+// Генерирует персональный совет или рекомендацию по семейному ужину (DeepSeek).
 // Ключ ИИ — в секретах Supabase, никогда не попадает в браузер.
 //
 // Секреты (Supabase Dashboard → Edge Functions → Secrets):
@@ -8,7 +8,7 @@
 //   AI_BASE_URL   — базовый URL API, по умолчанию https://api.deepseek.com
 //   AI_MODEL      — модель, по умолчанию deepseek-chat
 //
-// Тело запроса: { date?: "YYYY-MM-DD", mode?: "personal" | "family" }
+// Тело запроса: { date?: "YYYY-MM-DD", mode?: "personal" | "dinner" }
 // ============================================================================
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
@@ -38,16 +38,16 @@ const SYSTEM_PROMPT = `Ты — персональный нутрициолог.
 6. Будь конкретным, но кратким. Не давай медицинских диагнозов и не назначай лечение.
 7. Оформи ответ как структурированный список с эмодзи.`;
 
-const FAMILY_SYSTEM_PROMPT = `Ты — семейный нутрициолог. Твоя задача — помочь семье мягко и безопасно РАСШИРИТЬ общий рацион: предложить блюда и продукты, которые подойдут КАЖДОМУ члену семьи и дополнят общий стол.
+const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь рекомендацию по общему семейному УЖИНУ.
 
 Правила ответа:
 1. Отвечай на русском языке.
-2. Аллергии и ограничения КАЖДОГО члена семьи — ЖЁСТКИЙ запрет для всей семьи: блюдо должно подходить всем без исключения.
-3. Учитывай вкусы и фактическое меню всех членов семьи.
-4. Предложи 4–6 конкретных блюд/продуктов для общего стола.
-5. Для каждого совета укажи: что это, почему подходит всей семье, и в какой приём пищи логично добавить.
-6. Будь конкретным, но кратким. Не давай медицинских диагнозов.
-7. Оформи ответ как структурированный список с эмодзи.`;
+2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет: блюда должны подходить всем без исключения.
+3. Учитывай роль и возраст каждого (мама/папа/дети), вкусы и то, что семья недавно ела.
+4. Предложи ужин для всей семьи. Если предпочтения сильно расходятся — дай 2–3 варианта блюд (не больше трёх), чтобы угодить всем.
+5. Для каждого блюда кратко укажи, почему оно подходит и кому.
+6. Обязательно добавь раздел «Купить» — список ингредиентов с количеством (что и сколько), рассчитанный на число членов семьи.
+7. Оформи структурированно и с эмодзи.`;
 
 type Row = Record<string, unknown>;
 
@@ -89,11 +89,19 @@ ${mealLines || "записей пока нет"}
 
 interface MemberData {
   name: string;
+  role: string; // mom | dad | kid
+  age: number | null;
   prefs: Row | null;
   meals: Row[];
 }
 
-function buildFamilyPrompt(
+const ROLE_LABELS: Record<string, string> = {
+  mom: "мама",
+  dad: "папа",
+  kid: "ребёнок",
+};
+
+function buildDinnerPrompt(
   familyName: string,
   members: MemberData[],
   date: string,
@@ -109,6 +117,8 @@ function buildFamilyPrompt(
 
   const memberLines = members
     .map((m) => {
+      const roleLabel = ROLE_LABELS[m.role] ?? "участник";
+      const ageStr = m.age != null ? `${m.age} лет` : "возраст не указан";
       const liked = arr(m.prefs?.liked_dishes).join(", ") || "не указано";
       const disliked = arr(m.prefs?.disliked_dishes).join(", ") || "не указано";
       const cuisines = arr(m.prefs?.cuisines).join(", ") || "не указаны";
@@ -116,21 +126,21 @@ function buildFamilyPrompt(
         m.meals
           .map((x) => `- ${String(x.entry_date ?? "")} [${String(x.meal_type ?? "")}]: ${String(x.dish_name ?? "")}`)
           .join("\n") || "нет записей";
-      return `### ${m.name}\nЛюбит: ${liked}\nНе любит: ${disliked}\nКухни: ${cuisines}\nМеню:\n${meals}`;
+      return `### ${m.name} (${roleLabel}, ${ageStr})\nЛюбит: ${liked}\nНе любит: ${disliked}\nКухни: ${cuisines}\nЕл(а) недавно:\n${meals}`;
     })
     .join("\n\n");
 
   return `Семья: ${familyName}
-Дата, на которую нужен совет: ${date}
+Дата ужина: ${date}
 
-=== ОБЩИЕ ОГРАНИЧЕНИЯ (жёсткий запрет для всех) ===
+=== ОБЩИЕ ОГРАНИЧЕНИЯ (жёсткий запрет для всех блюд) ===
 Аллергии/непереносимость: ${[...allAllergies].join(", ") || "нет"}
 Ограничения в питании: ${[...allRestrictions].join(", ") || "нет"}
 
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}
 
-Составь совет по расширению рациона для ВСЕЙ семьи: предложи блюда и продукты, которые подходят каждому и дополнят общий стол.`;
+Составь рекомендацию по общему семейному ужину: что приготовить (при сильных расхождениях во вкусах — до 2–3 вариантов блюд) и обязательный список покупок — какие ингредиенты и в каком количестве нужны.`;
 }
 
 async function callLLM(system: string, prompt: string): Promise<string> {
@@ -157,7 +167,7 @@ async function callLLM(system: string, prompt: string): Promise<string> {
         { role: "user", content: prompt },
       ],
       temperature: 0.7,
-      max_tokens: 1400,
+      max_tokens: 1600,
     }),
   });
 
@@ -203,7 +213,7 @@ async function personalAdvice(
   return data;
 }
 
-async function familyAdvice(
+async function dinnerAdvice(
   db: ReturnType<typeof createClient>,
   userId: string,
   date: string,
@@ -220,14 +230,17 @@ async function familyAdvice(
 
   const [{ data: familyRow }, { data: memberRows }] = await Promise.all([
     db.from("families").select("name").eq("id", familyId).single(),
-    db.from("family_members").select("user_id").eq("family_id", familyId),
+    db
+      .from("family_members")
+      .select("user_id, member_role")
+      .eq("family_id", familyId),
   ]);
 
   const familyName = (familyRow?.name as string) || "Семья";
-  const memberIds = (memberRows ?? []).map((r) => r.user_id as string);
 
   const members: MemberData[] = await Promise.all(
-    memberIds.map(async (uid) => {
+    (memberRows ?? []).map(async (row) => {
+      const uid = row.user_id as string;
       const [prefsRes, mealsRes, profileRes] = await Promise.all([
         db.from("preferences").select("*").eq("user_id", uid).maybeSingle(),
         db
@@ -236,18 +249,32 @@ async function familyAdvice(
           .eq("user_id", uid)
           .order("entry_date", { ascending: false })
           .limit(40),
-        db.from("profiles").select("full_name, email").eq("id", uid).maybeSingle(),
+        db
+          .from("profiles")
+          .select("full_name, email, age")
+          .eq("id", uid)
+          .maybeSingle(),
       ]);
       const name =
         (profileRes.data?.full_name as string) ||
         String(profileRes.data?.email ?? "").split("@")[0] ||
         "Участник";
-      return { name, prefs: prefsRes.data ?? null, meals: mealsRes.data ?? [] };
+      const age =
+        profileRes.data?.age != null
+          ? Number(profileRes.data.age)
+          : null;
+      return {
+        name,
+        role: String(row.member_role ?? "kid"),
+        age,
+        prefs: prefsRes.data ?? null,
+        meals: mealsRes.data ?? [],
+      };
     }),
   );
 
-  const prompt = buildFamilyPrompt(familyName, members, date);
-  const content = await callLLM(FAMILY_SYSTEM_PROMPT, prompt);
+  const prompt = buildDinnerPrompt(familyName, members, date);
+  const content = await callLLM(DINNER_SYSTEM_PROMPT, prompt);
 
   const { data, error } = await db
     .from("family_advice")
@@ -295,21 +322,21 @@ Deno.serve(async (req) => {
 
   // Дата (локальная дата пользователя в формате YYYY-MM-DD)
   let date = new Date().toISOString().slice(0, 10);
-  let mode: "personal" | "family" = "personal";
+  let mode: "personal" | "dinner" = "personal";
   try {
     const body = await req.json();
     if (body?.date && typeof body.date === "string" && /^\d{4}-\d{2}-\d{2}$/.test(body.date)) {
       date = body.date;
     }
-    if (body?.mode === "family") mode = "family";
+    if (body?.mode === "dinner") mode = "dinner";
   } catch (_) {
     // тело не обязательно
   }
 
   try {
     const advice =
-      mode === "family"
-        ? await familyAdvice(db, user.id, date)
+      mode === "dinner"
+        ? await dinnerAdvice(db, user.id, date)
         : await personalAdvice(db, user.id, date);
     return json({ advice, mode });
   } catch (e) {

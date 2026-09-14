@@ -4,6 +4,7 @@ export interface Profile {
   id: string;
   email: string | null;
   full_name: string | null;
+  age: number | null;
   created_at: string;
 }
 
@@ -60,12 +61,28 @@ export const DIETARY_OPTIONS = [
 ] as const;
 
 export type FamilyRole = "owner" | "member";
+export type FamilyMemberRole = "mom" | "dad" | "kid";
+
+export const FAMILY_ROLES: {
+  value: FamilyMemberRole;
+  label: string;
+  emoji: string;
+}[] = [
+  { value: "mom", label: "Мама", emoji: "👩" },
+  { value: "dad", label: "Папа", emoji: "👨" },
+  { value: "kid", label: "Ребёнок", emoji: "🧒" },
+];
+
+export const familyRoleLabel = (r: FamilyMemberRole): string =>
+  FAMILY_ROLES.find((x) => x.value === r)?.label ?? r;
 
 export interface FamilyMember {
   user_id: string;
   role: FamilyRole;
+  member_role: FamilyMemberRole;
   full_name: string;
   email: string;
+  age: number | null;
   joined_at: string;
 }
 

@@ -1,5 +1,5 @@
 import { supabase } from "./supabase";
-import type { Family } from "./types";
+import type { Family, FamilyMemberRole } from "./types";
 
 export async function getMyFamily(): Promise<Family | null> {
   const { data, error } = await supabase.rpc("get_my_family");
@@ -15,22 +15,41 @@ export function generateInviteCode(length = 8): string {
   return Array.from(buf, (n) => chars[n % chars.length]).join("");
 }
 
-export async function createFamily(name: string): Promise<string> {
+export async function createFamily(
+  name: string,
+  memberRole: FamilyMemberRole,
+): Promise<string> {
   const code = generateInviteCode();
   const { data, error } = await supabase.rpc("create_family", {
     fam_name: name,
     fam_code: code,
+    fam_role: memberRole,
   });
   if (error) throw new Error(error.message);
   return data as string;
 }
 
-export async function joinFamily(code: string): Promise<string> {
+export async function joinFamily(
+  code: string,
+  memberRole: FamilyMemberRole,
+): Promise<string> {
   const { data, error } = await supabase.rpc("join_family", {
     fam_code: code,
+    fam_role: memberRole,
   });
   if (error) throw new Error(error.message);
   return data as string;
+}
+
+export async function setFamilyRole(
+  userId: string,
+  role: FamilyMemberRole,
+): Promise<void> {
+  const { error } = await supabase.rpc("set_family_role", {
+    target: userId,
+    new_role: role,
+  });
+  if (error) throw new Error(error.message);
 }
 
 export async function leaveFamily(): Promise<void> {

@@ -8,7 +8,7 @@ import { getMyFamily } from "@/lib/family";
 import { DailyAdvice, Family, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 
-type Tab = "personal" | "family";
+type Tab = "personal" | "dinner";
 
 function extractError(err: unknown): string {
   if (!err) return "Неизвестная ошибка";
@@ -32,7 +32,7 @@ export default function AdvicePage() {
   const [tab, setTab] = useState<Tab>("personal");
 
   const [personal, setPersonal] = useState<DailyAdvice[]>([]);
-  const [familyAdvice, setFamilyAdvice] = useState<FamilyAdvice[]>([]);
+  const [dinnerAdvice, setDinnerAdvice] = useState<FamilyAdvice[]>([]);
 
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
@@ -48,14 +48,14 @@ export default function AdvicePage() {
     setPersonal(data ?? []);
   }, [user]);
 
-  const loadFamilyAdvice = useCallback(async () => {
+  const loadDinnerAdvice = useCallback(async () => {
     if (!family) return;
     const { data } = await supabase
       .from("family_advice")
       .select("*")
       .eq("family_id", family.id)
       .order("advice_date", { ascending: false });
-    setFamilyAdvice(data ?? []);
+    setDinnerAdvice(data ?? []);
   }, [family]);
 
   useEffect(() => {
@@ -72,8 +72,8 @@ export default function AdvicePage() {
   }, [loadPersonal]);
 
   useEffect(() => {
-    if (family) loadFamilyAdvice();
-  }, [family, loadFamilyAdvice]);
+    if (family) loadDinnerAdvice();
+  }, [family, loadDinnerAdvice]);
 
   async function generate(mode: Tab) {
     if (!user) return;
@@ -95,12 +95,12 @@ export default function AdvicePage() {
       setError(data.error);
       return;
     }
-    if (mode === "family") await loadFamilyAdvice();
+    if (mode === "dinner") await loadDinnerAdvice();
     else await loadPersonal();
   }
 
   const today = todayLocal();
-  const currentList = tab === "family" ? familyAdvice : personal;
+  const currentList = tab === "dinner" ? dinnerAdvice : personal;
 
   return (
     <div className="space-y-6">
@@ -127,36 +127,36 @@ export default function AdvicePage() {
             Личный совет
           </button>
           <button
-            onClick={() => setTab("family")}
+            onClick={() => setTab("dinner")}
             className={`rounded-lg px-4 py-2 text-sm font-semibold transition ${
-              tab === "family"
+              tab === "dinner"
                 ? "bg-brand-600 text-white"
                 : "bg-stone-100 text-stone-600 hover:bg-stone-200"
             }`}
           >
-            Семейный совет 👨‍👩‍👧
+            Рекомендация по ужину 🍽️
           </button>
         </div>
       )}
 
-      {tab === "family" && !family && (
+      {tab === "dinner" && !family && (
         <div className="card text-center text-stone-500">
-          <div className="text-4xl">👨‍👩‍👧</div>
+          <div className="text-4xl">🍽️</div>
           <p className="mt-2">Вы ещё не в семье.</p>
           <p className="text-sm">
             <Link href="/family" className="font-medium text-brand-600 hover:underline">
               Создайте или присоединитесь к семье
             </Link>
-            , чтобы получать общий совет.
+            , чтобы получать рекомендацию по общему ужину.
           </p>
         </div>
       )}
 
-      {!(tab === "family" && !family) && (
+      {!(tab === "dinner" && !family) && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-stone-500">
-            {tab === "family"
-              ? "Совет для всей семьи с учётом предпочтений и меню каждого."
+            {tab === "dinner"
+              ? "Что приготовить на общий семейный ужин + список покупок."
               : "Персональный совет с учётом ваших предпочтений и меню."}
           </p>
           <button
@@ -167,8 +167,8 @@ export default function AdvicePage() {
             {generating
               ? "ИИ думает…"
               : currentList.some((a) => a.advice_date === today)
-                ? "Обновить совет на сегодня"
-                : "Получить совет на сегодня"}
+                ? "Обновить на сегодня"
+                : "Получить на сегодня"}
           </button>
         </div>
       )}
@@ -182,19 +182,19 @@ export default function AdvicePage() {
       {generating && (
         <div className="card flex items-center gap-3 text-stone-500">
           <span className="h-4 w-4 animate-spin rounded-full border-2 border-stone-300 border-t-brand-600" />
-          Составляем {tab === "family" ? "семейный" : "персональный"} совет —
+          Составляем {tab === "dinner" ? "рекомендацию по ужину" : "персональный совет"} —
           обычно занимает несколько секунд…
         </div>
       )}
 
       {loading ? (
         <p className="text-stone-500">Загрузка…</p>
-      ) : currentList.length === 0 && !generating && !(tab === "family" && !family) ? (
+      ) : currentList.length === 0 && !generating && !(tab === "dinner" && !family) ? (
         <div className="card text-center text-stone-500">
           <div className="text-4xl">💡</div>
-          <p className="mt-2">Советов пока нет.</p>
+          <p className="mt-2">Пока пусто.</p>
           <p className="text-sm">
-            Заполните дневник питания и нажмите «Получить совет».
+            Заполните дневник питания и нажмите «Получить на сегодня».
           </p>
         </div>
       ) : (

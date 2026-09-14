@@ -3,13 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
-import type { Family } from "@/lib/types";
+import {
+  FAMILY_ROLES,
+  Family,
+  FamilyMemberRole,
+  familyRoleLabel,
+} from "@/lib/types";
 import {
   createFamily,
   getMyFamily,
   joinFamily,
   leaveFamily,
   removeFamilyMember,
+  setFamilyRole,
 } from "@/lib/family";
 
 function msg(e: unknown): string {
@@ -24,7 +30,9 @@ export default function FamilyPage() {
   const [busy, setBusy] = useState(false);
 
   const [newName, setNewName] = useState("");
+  const [createRole, setCreateRole] = useState<FamilyMemberRole>("mom");
   const [joinCode, setJoinCode] = useState("");
+  const [joinRole, setJoinRole] = useState<FamilyMemberRole>("mom");
   const [copied, setCopied] = useState(false);
 
   const load = useCallback(async () => {
@@ -49,7 +57,7 @@ export default function FamilyPage() {
     setBusy(true);
     setError("");
     try {
-      await createFamily(newName.trim());
+      await createFamily(newName.trim(), createRole);
       await load();
       setNewName("");
     } catch (err) {
@@ -65,7 +73,7 @@ export default function FamilyPage() {
     setBusy(true);
     setError("");
     try {
-      await joinFamily(joinCode.trim().toUpperCase());
+      await joinFamily(joinCode.trim().toUpperCase(), joinRole);
       await load();
       setJoinCode("");
     } catch (err) {
@@ -106,6 +114,19 @@ export default function FamilyPage() {
     }
   }
 
+  async function handleChangeRole(userId: string, role: FamilyMemberRole) {
+    setBusy(true);
+    setError("");
+    try {
+      await setFamilyRole(userId, role);
+      await load();
+    } catch (err) {
+      setError(msg(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function copyCode() {
     if (!family) return;
     try {
@@ -117,6 +138,10 @@ export default function FamilyPage() {
     }
   }
 
+  function canEditRole(userId: string): boolean {
+    return !!isOwner || userId === user?.id;
+  }
+
   if (loading) {
     return <p className="text-stone-500">Загрузка…</p>;
   }
@@ -126,7 +151,8 @@ export default function FamilyPage() {
       <div>
         <h1 className="text-2xl font-bold">Семья 👨‍👩‍👧</h1>
         <p className="text-stone-500">
-          Объединитесь с близкими: общий дневник и советы для всей семьи.
+          Объединитесь с близкими: общий дневник и рекомендации по ужину для
+          всей семьи.
         </p>
       </div>
 
@@ -157,6 +183,23 @@ export default function FamilyPage() {
                 placeholder="Например: Семья Ивановых"
               />
             </div>
+            <div>
+              <label htmlFor="createRole" className="label">
+                Ваша роль в семье
+              </label>
+              <select
+                id="createRole"
+                className="input"
+                value={createRole}
+                onChange={(e) => setCreateRole(e.target.value as FamilyMemberRole)}
+              >
+                {FAMILY_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.emoji} {r.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button type="submit" disabled={busy} className="btn-primary w-full">
               {busy ? "Создаём…" : "Создать семью"}
             </button>
@@ -180,6 +223,23 @@ export default function FamilyPage() {
                 onChange={(e) => setJoinCode(e.target.value)}
                 placeholder="ABCD1234"
               />
+            </div>
+            <div>
+              <label htmlFor="joinRole" className="label">
+                Ваша роль в семье
+              </label>
+              <select
+                id="joinRole"
+                className="input"
+                value={joinRole}
+                onChange={(e) => setJoinRole(e.target.value as FamilyMemberRole)}
+              >
+                {FAMILY_ROLES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.emoji} {r.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <button type="submit" disabled={busy} className="btn-primary w-full">
               {busy ? "Вступаем…" : "Присоединиться"}
@@ -219,7 +279,7 @@ export default function FamilyPage() {
               {family.members.map((m) => (
                 <li
                   key={m.user_id}
-                  className="flex items-center justify-between gap-3 py-2"
+                  className="flex flex-wrap items-center justify-between gap-3 py-2"
                 >
                   <div className="min-w-0">
                     <div className="truncate text-sm font-medium">
@@ -228,6 +288,7 @@ export default function FamilyPage() {
                     </div>
                     <div className="truncate text-xs text-stone-500">
                       {m.email}
+                      {m.age != null && ` · ${m.age} лет`}
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -240,6 +301,31 @@ export default function FamilyPage() {
                     >
                       {m.role === "owner" ? "Владелец" : "Участник"}
                     </span>
+
+                    {canEditRole(m.user_id) ? (
+                      <select
+                        className="input !w-auto !py-1 text-sm"
+                        value={m.member_role}
+                        disabled={busy}
+                        onChange={(e) =>
+                          handleChangeRole(
+                            m.user_id,
+                            e.target.value as FamilyMemberRole,
+                          )
+                        }
+                      >
+                        {FAMILY_ROLES.map((r) => (
+                          <option key={r.value} value={r.value}>
+                            {r.emoji} {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <span className="text-sm text-stone-600">
+                        {familyRoleLabel(m.member_role)}
+                      </span>
+                    )}
+
                     {isOwner && m.role !== "owner" && (
                       <button
                         onClick={() => handleRemove(m.user_id)}
@@ -257,7 +343,7 @@ export default function FamilyPage() {
 
           <div className="flex flex-wrap gap-3">
             <Link href="/advice" className="btn-primary">
-              Семейный совет 💡
+              Рекомендация по ужину 🍽️
             </Link>
             <button
               onClick={handleLeave}

@@ -9,6 +9,7 @@ import { authErrorMessage } from "@/lib/auth-errors";
 export default function RegisterPage() {
   const router = useRouter();
   const [fullName, setFullName] = useState("");
+  const [age, setAge] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
@@ -24,7 +25,12 @@ export default function RegisterPage() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: { data: { full_name: fullName } },
+      options: {
+        data: {
+          full_name: fullName,
+          age: age ? Number(age) : null,
+        },
+      },
     });
     setLoading(false);
 
@@ -64,6 +70,21 @@ export default function RegisterPage() {
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               placeholder="Как к вам обращаться"
+            />
+          </div>
+          <div>
+            <label htmlFor="age" className="label">
+              Возраст
+            </label>
+            <input
+              id="age"
+              type="number"
+              min={1}
+              max={120}
+              className="input"
+              value={age}
+              onChange={(e) => setAge(e.target.value)}
+              placeholder="Необязательно"
             />
           </div>
           <div>
