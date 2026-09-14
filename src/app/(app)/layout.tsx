@@ -3,6 +3,7 @@
 import { AuthProvider } from "@/components/AuthProvider";
 import { RequireAuth } from "@/components/RequireAuth";
 import { AppShell } from "@/components/AppShell";
+import { FamilyProvider } from "@/components/FamilyProvider";
 
 export default function AppLayout({
   children,
@@ -12,7 +13,9 @@ export default function AppLayout({
   return (
     <AuthProvider>
       <RequireAuth>
-        <AppShell>{children}</AppShell>
+        <FamilyProvider>
+          <AppShell>{children}</AppShell>
+        </FamilyProvider>
       </RequireAuth>
     </AuthProvider>
   );

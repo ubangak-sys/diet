@@ -4,10 +4,9 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { getMyFamily } from "@/lib/family";
+import { useFamily } from "@/components/FamilyProvider";
 import {
   DailyAdvice,
-  Family,
   FamilyAdvice,
   MealEntry,
   Profile,
@@ -24,7 +23,7 @@ export default function DashboardPage() {
   const [todayMeals, setTodayMeals] = useState<MealEntry[]>([]);
   const [latestAdvice, setLatestAdvice] = useState<DailyAdvice | null>(null);
 
-  const [family, setFamily] = useState<Family | null>(null);
+  const { family } = useFamily();
   const [dinner, setDinner] = useState<FamilyAdvice | null>(null);
   const [generatingDinner, setGeneratingDinner] = useState(false);
   const [dinnerError, setDinnerError] = useState("");
@@ -73,9 +72,6 @@ export default function DashboardPage() {
       .maybeSingle()
       .then(({ data }) => setLatestAdvice(data ?? null));
 
-    getMyFamily()
-      .then(setFamily)
-      .catch(() => setFamily(null));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 

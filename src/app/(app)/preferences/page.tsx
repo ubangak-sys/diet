@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { getMyFamily } from "@/lib/family";
-import { DIETARY_OPTIONS, Family, Preferences } from "@/lib/types";
+import { useFamily } from "@/components/FamilyProvider";
+import { DIETARY_OPTIONS, Preferences } from "@/lib/types";
 import { arrayToText, textToArray } from "@/lib/utils";
 
 const EMPTY: Preferences = {
@@ -23,7 +23,7 @@ const EMPTY: Preferences = {
 export default function PreferencesPage() {
   const { user } = useAuth();
 
-  const [family, setFamily] = useState<Family | null>(null);
+  const { family, refresh } = useFamily();
   const [selectedUserId, setSelectedUserId] = useState("");
 
   const [fullName, setFullName] = useState("");
@@ -47,18 +47,6 @@ export default function PreferencesPage() {
   const isParent = me?.member_role === "mom" || me?.member_role === "dad";
   const kids = members.filter((m) => m.member_role === "kid");
   const editingChild = !!selectedUserId && selectedUserId !== user?.id;
-
-  const loadFamily = useCallback(async () => {
-    try {
-      setFamily(await getMyFamily());
-    } catch {
-      setFamily(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFamily();
-  }, [loadFamily]);
 
   useEffect(() => {
     if (user) setSelectedUserId(user.id);
@@ -142,7 +130,7 @@ export default function PreferencesPage() {
       setMessage(`Ошибка: ${prefsRes.error.message}`);
     } else {
       setMessage("Сохранено ✅ ИИ учтёт это в советах и рекомендациях.");
-      await loadFamily();
+      await refresh();
     }
   }
 

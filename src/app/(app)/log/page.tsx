@@ -1,11 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { getMyFamily } from "@/lib/family";
+import { useFamily } from "@/components/FamilyProvider";
 import {
-  Family,
   MEAL_TYPES,
   MealEntry,
   MealType,
@@ -15,7 +14,7 @@ import { addDays, formatDateRu, todayLocal } from "@/lib/utils";
 
 export default function LogPage() {
   const { user } = useAuth();
-  const [family, setFamily] = useState<Family | null>(null);
+  const { family } = useFamily();
   const [date, setDate] = useState(todayLocal());
   const [entries, setEntries] = useState<MealEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -34,18 +33,6 @@ export default function LogPage() {
   const isParent = me?.member_role === "mom" || me?.member_role === "dad";
   const kids = members.filter((m) => m.member_role === "kid");
   const kidsSet = new Set(kids.map((k) => k.user_id));
-
-  const loadFamily = useCallback(async () => {
-    try {
-      setFamily(await getMyFamily());
-    } catch {
-      /* нет семьи — ок */
-    }
-  }, []);
-
-  useEffect(() => {
-    loadFamily();
-  }, [loadFamily]);
 
   useEffect(() => {
     if (user) setForUserId(user.id);

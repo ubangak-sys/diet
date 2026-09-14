@@ -1,17 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
+import { useFamily } from "@/components/FamilyProvider";
 import {
   FAMILY_ROLES,
-  Family,
   FamilyMemberRole,
   familyRoleLabel,
 } from "@/lib/types";
 import {
   createFamily,
-  getMyFamily,
   joinFamily,
   leaveFamily,
   removeFamilyMember,
@@ -25,8 +24,7 @@ function msg(e: unknown): string {
 
 export default function FamilyPage() {
   const { user } = useAuth();
-  const [family, setFamily] = useState<Family | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { family, loading, refresh } = useFamily();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -35,20 +33,6 @@ export default function FamilyPage() {
   const [joinCode, setJoinCode] = useState("");
   const [joinRole, setJoinRole] = useState<FamilyMemberRole>("mom");
   const [copied, setCopied] = useState(false);
-
-  const load = useCallback(async () => {
-    try {
-      setFamily(await getMyFamily());
-    } catch (e) {
-      setError(msg(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    load();
-  }, [load]);
 
   const isOwner = family?.owner_id === user?.id;
 
@@ -59,7 +43,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await createFamily(newName.trim(), createRole);
-      await load();
+      await refresh();
       setNewName("");
     } catch (err) {
       setError(msg(err));
@@ -75,7 +59,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await joinFamily(joinCode.trim().toUpperCase(), joinRole);
-      await load();
+      await refresh();
       setJoinCode("");
     } catch (err) {
       setError(msg(err));
@@ -93,7 +77,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await leaveFamily();
-      await load();
+      await refresh();
     } catch (err) {
       setError(msg(err));
     } finally {
@@ -107,7 +91,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await removeFamilyMember(id);
-      await load();
+      await refresh();
     } catch (err) {
       setError(msg(err));
     } finally {
@@ -120,7 +104,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await setFamilyRole(userId, role);
-      await load();
+      await refresh();
     } catch (err) {
       setError(msg(err));
     } finally {
@@ -147,7 +131,7 @@ export default function FamilyPage() {
     setError("");
     try {
       await rotateInviteCode();
-      await load();
+      await refresh();
     } catch (err) {
       setError(msg(err));
     } finally {

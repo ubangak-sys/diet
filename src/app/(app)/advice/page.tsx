@@ -4,8 +4,8 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
-import { getMyFamily } from "@/lib/family";
-import { DailyAdvice, Family, FamilyAdvice } from "@/lib/types";
+import { useFamily } from "@/components/FamilyProvider";
+import { DailyAdvice, FamilyAdvice } from "@/lib/types";
 import { formatDateRu, todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
 import { DinnerPlanView } from "@/components/DinnerPlanView";
@@ -15,7 +15,7 @@ type Tab = "personal" | "dinner";
 
 export default function AdvicePage() {
   const { user } = useAuth();
-  const [family, setFamily] = useState<Family | null>(null);
+  const { family } = useFamily();
   const [tab, setTab] = useState<Tab>("personal");
 
   const [selectedUserId, setSelectedUserId] = useState("");
@@ -52,23 +52,11 @@ export default function AdvicePage() {
   }, [family]);
 
   useEffect(() => {
-    (async () => {
-      try {
-        const f = await getMyFamily();
-        setFamily(f);
-      } catch {
-        setFamily(null);
-      }
-      setLoading(false);
-    })();
-  }, []);
-
-  useEffect(() => {
     if (user) setSelectedUserId(user.id);
   }, [user]);
 
   useEffect(() => {
-    loadPersonal();
+    loadPersonal().finally(() => setLoading(false));
   }, [loadPersonal]);
 
   useEffect(() => {
