@@ -49,7 +49,8 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
       "title": "Основное блюдо дня 1",
       "why": "почему подходит и кому",
       "variants": ["альтернативный вариант 2", "альтернативный вариант 3"],
-      "cooking": "краткая инструкция приготовления (2–3 шага)"
+      "time": "~40 минут",
+      "cooking": "подробная пошаговая инструкция приготовления (5–6 шагов, с ключевыми действиями)"
     },
     { "day": 2, "title": "Блюдо дня 2", "why": "почему подходит" },
     { "day": 3, "title": "Блюдо дня 3", "why": "почему подходит" }
@@ -58,7 +59,11 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
     { "item": "Ингредиент", "amount": "количество ТОЛЬКО для дня 1" }
   ],
   "lunchboxes": [
-    { "for": "Имя школьника", "note": "что положить с собой" }
+    {
+      "for": "Имя школьника",
+      "items": ["что положить — позиция 1", "позиция 2", "позиция 3"],
+      "note": "совет: как хранить или что не класть"
+    }
   ]
 }
 
@@ -67,10 +72,10 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 2. Аллергии и ограничения каждого члена семьи — ЖЁСТКИЙ запрет.
 3. Учитывай роль, возраст, вкусы и недавнее меню.
 4. Всего РОВНО 3 ужина (day 1, 2, 3).
-5. День 1 — самый подробный: 1 основное блюдо + 2 альтернативных варианта в "variants" + краткая инструкция в "cooking".
+5. День 1 — самый подробный: 1 основное блюдо + 2 альтернативных варианта в "variants" + время в "time" + подробная инструкция в "cooking".
 6. Дни 2 и 3 — коротко: только title и why.
 7. shopping — список покупок ТОЛЬКО для дня 1, с количеством.
-8. lunchboxes — только для школьников старше 7 лет; если таких нет, верни пустой массив.
+8. lunchboxes — только для школьников старше 7 лет; для каждого — items (что положить) и note (совет); если таких нет, верни пустой массив.
 9. «Пожелания по ужину» — мягкие, учитывай при возможности.
 10. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
 
@@ -84,6 +89,7 @@ interface DinnerPlanItem {
   title: string;
   why?: string;
   variants?: string[];
+  time?: string;
   cooking?: string;
 }
 interface ShoppingItem {
@@ -92,6 +98,7 @@ interface ShoppingItem {
 }
 interface LunchboxItem {
   for: string;
+  items?: string[];
   note?: string;
 }
 interface DinnerPlan {
@@ -119,6 +126,7 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
             title: String(o.title ?? o.dish ?? "").trim(),
             why: o.why != null ? String(o.why) : undefined,
             variants: variants && variants.length ? variants : undefined,
+            time: o.time != null ? String(o.time) : undefined,
             cooking: o.cooking != null ? String(o.cooking) : undefined,
           };
         })
@@ -140,8 +148,12 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
       const lunchboxes = (Array.isArray(raw.lunchboxes) ? raw.lunchboxes : [])
         .map((x) => {
           const o = (x ?? {}) as Record<string, unknown>;
+          const items = Array.isArray(o.items)
+            ? o.items.map((v) => String(v).trim()).filter(Boolean)
+            : undefined;
           return {
             for: String(o.for ?? "").trim(),
+            items: items && items.length ? items : undefined,
             note: o.note != null ? String(o.note) : undefined,
           };
         })

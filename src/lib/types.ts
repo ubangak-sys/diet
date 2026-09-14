@@ -101,6 +101,7 @@ export interface DinnerPlanItem {
   title: string;
   why?: string;
   variants?: string[];
+  time?: string;
   cooking?: string;
 }
 
@@ -111,6 +112,7 @@ export interface ShoppingItem {
 
 export interface LunchboxItem {
   for: string;
+  items?: string[];
   note?: string;
 }
 

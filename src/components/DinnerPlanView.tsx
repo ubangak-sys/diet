@@ -62,6 +62,11 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
                         {d.variants.join(" · ")}
                       </div>
                     )}
+                    {d.time && (
+                      <div className="mt-1 text-xs text-stone-500">
+                        ⏱️ {d.time}
+                      </div>
+                    )}
                     {d.cooking && (
                       <div className="mt-1 rounded-md bg-white px-2 py-1 text-xs text-stone-600">
                         <span className="font-medium">
@@ -137,10 +142,20 @@ export function DinnerPlanView({ plan }: { plan: DinnerPlan }) {
       {plan.lunchboxes && plan.lunchboxes.length > 0 && (
         <div>
           <h3 className="mb-2 font-semibold">🍱 Ланчбоксы на завтра</h3>
-          <ul className="space-y-1">
+          <ul className="space-y-2">
             {plan.lunchboxes.map((l, i) => (
               <li key={i} className="rounded-lg bg-stone-50 px-3 py-2 text-sm">
-                <span className="font-medium">{l.for}:</span> {l.note}
+                <div className="font-medium">{l.for}</div>
+                {l.items && l.items.length > 0 && (
+                  <ul className="mt-1 list-inside list-disc space-y-0.5 text-stone-600">
+                    {l.items.map((it, j) => (
+                      <li key={j}>{it}</li>
+                    ))}
+                  </ul>
+                )}
+                {l.note && (
+                  <div className="mt-1 text-xs text-stone-500">💡 {l.note}</div>
+                )}
               </li>
             ))}
           </ul>
