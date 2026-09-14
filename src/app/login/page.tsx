@@ -92,6 +92,11 @@ export default function LoginPage() {
               Зарегистрироваться
             </Link>
           </p>
+          <p className="text-center text-sm text-stone-500">
+            <Link href="/forgot-password" className="font-medium text-brand-600 hover:underline">
+              Забыли пароль?
+            </Link>
+          </p>
         </form>
       </div>
     </div>
