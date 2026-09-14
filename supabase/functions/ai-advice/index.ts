@@ -156,19 +156,14 @@ ${memberLines}${schoolSection}
 Составь рекомендацию по общему семейному ужину: что приготовить (при сильных расхождениях во вкусах — до 2–3 вариантов блюд) и обязательный список покупок — какие ингредиенты и в каком количестве нужны. Учти «Пожелания по ужину» участников, но они вторичны по отношению к совместимости.${schoolKids.length > 0 ? " Также добавь раздел «🍱 Ланчбокс на завтра» для каждого школьника." : ""}`;
 }
 
-async function callLLM(system: string, prompt: string): Promise<string> {
-  const baseUrl = Deno.env.get("AI_BASE_URL") || "https://api.deepseek.com";
-  const apiKey = Deno.env.get("AI_API_KEY");
-  const model = Deno.env.get("AI_MODEL") || "deepseek-chat";
-  // Таймаут, чтобы не упираться в лимит 150с Edge Function (бесплатный тариф)
-  const timeoutMs = Number(Deno.env.get("AI_TIMEOUT_MS") || "70000");
-
-  if (!apiKey) {
-    throw new Error(
-      "AI_API_KEY не задан. Добавьте секрет в Supabase Dashboard → Edge Functions → Secrets.",
-    );
-  }
-
+async function callLLMOnce(
+  baseUrl: string,
+  apiKey: string,
+  model: string,
+  system: string,
+  prompt: string,
+  timeoutMs: number,
+): Promise<string> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
 
@@ -202,14 +197,47 @@ async function callLLM(system: string, prompt: string): Promise<string> {
     return content.trim();
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") {
-      throw new Error(
-        "ИИ не ответил вовремя (таймаут). Попробуйте ещё раз.",
-      );
+      throw new Error("TIMEOUT");
     }
     throw e;
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function callLLM(system: string, prompt: string): Promise<string> {
+  const baseUrl = Deno.env.get("AI_BASE_URL") || "https://api.deepseek.com";
+  const apiKey = Deno.env.get("AI_API_KEY");
+  const model = Deno.env.get("AI_MODEL") || "deepseek-chat";
+  // Настройки: AI_TIMEOUT_MS — таймаут одной попытки (мс), AI_ATTEMPTS — число попыток
+  const timeoutMs = Number(Deno.env.get("AI_TIMEOUT_MS") || "50000");
+  const attempts = Number(Deno.env.get("AI_ATTEMPTS") || "2");
+
+  if (!apiKey) {
+    throw new Error(
+      "AI_API_KEY не задан. Добавьте секрет в Supabase Dashboard → Edge Functions → Secrets.",
+    );
+  }
+
+  let lastError: Error | null = null;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await callLLMOnce(baseUrl, apiKey, model, system, prompt, timeoutMs);
+    } catch (e) {
+      const err = e instanceof Error ? e : new Error(String(e));
+      // Ошибки самого API (неверный ключ, нет баланса, неверная модель) не ретраим
+      if (err.message.startsWith("AI API error")) {
+        throw err;
+      }
+      lastError = err;
+    }
+  }
+
+  const message =
+    lastError?.message === "TIMEOUT"
+      ? "ИИ не ответил вовремя (таймаут). Попробуйте ещё раз."
+      : (lastError?.message ?? "Ошибка ИИ");
+  throw new Error(message);
 }
 
 async function personalAdvice(
