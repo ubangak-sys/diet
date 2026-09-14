@@ -173,6 +173,8 @@ async function callLLMOnce(
       headers: {
         "Authorization": `Bearer ${apiKey}`,
         "Content-Type": "application/json",
+        "HTTP-Referer": Deno.env.get("APP_URL") || "https://ration.example.com",
+        "X-Title": "Ration+",
       },
       body: JSON.stringify({
         model,
