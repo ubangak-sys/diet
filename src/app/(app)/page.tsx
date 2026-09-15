@@ -15,6 +15,7 @@ import {
 import { todayLocal } from "@/lib/utils";
 import { Markdown } from "@/components/Markdown";
 import { DinnerPlanView } from "@/components/DinnerPlanView";
+import { Leftovers } from "@/components/Leftovers";
 import { extractError } from "@/lib/edge-errors";
 
 export default function DashboardPage() {
@@ -208,6 +209,8 @@ export default function DashboardPage() {
           </p>
         )}
       </section>
+
+      <Leftovers />
 
       <div className="grid gap-4 sm:grid-cols-3">
         <Link href="/log" className="card hover:border-brand-500 transition">

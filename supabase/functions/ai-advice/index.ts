@@ -77,7 +77,8 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 7. shopping — список покупок ТОЛЬКО для дня 1, с количеством.
 8. lunchboxes — только для школьников старше 7 лет; для каждого — items (что положить) и note (совет); если таких нет, верни пустой массив.
 9. «Пожелания по ужину» — мягкие, учитывай при возможности.
-10. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
+10. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.
+11. Используй остатки из «ОСТАЛОСЬ ГОТОВОЕ» в первую очередь: запланируй их на ближайшие ужины (разогреть + лёгкий гарнир/салат), не предлагай готовить то же заново и сократи список покупок.`;
 
 type Row = Record<string, unknown>;
 
@@ -101,6 +102,12 @@ interface LunchboxItem {
   for: string;
   items?: string[];
   note?: string;
+}
+
+interface LeftoverInfo {
+  dish: string;
+  amount: string | null;
+  cooked_on: string | null;
 }
 interface DinnerPlan {
   dinners: DinnerPlanItem[];
@@ -255,6 +262,7 @@ function buildDinnerPrompt(
   members: MemberData[],
   date: string,
   banned: string[],
+  leftovers: LeftoverInfo[],
 ): string {
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
@@ -291,6 +299,14 @@ function buildDinnerPrompt(
           .join(", ")}`
       : "";
 
+  const leftoverLines = leftovers
+    .map((l) => {
+      const amount = l.amount ? ` (${l.amount})` : "";
+      const fresh = l.cooked_on ? `, сварен ${l.cooked_on}` : "";
+      return `- ${l.dish}${amount}${fresh}`;
+    })
+    .join("\n");
+
   return `Семья: ${familyName}
 Дата ужина: ${date}
 
@@ -299,10 +315,13 @@ function buildDinnerPrompt(
 Ограничения в питании: ${[...allRestrictions].join(", ") || "нет"}
 НЕ ПРЕДЛАГАТЬ (отвергнуто много раз): ${banned.length ? banned.join(", ") : "нет"}
 
+=== ОСТАЛОСЬ ГОТОВОЕ (нужно доесть в первую очередь) ===
+${leftoverLines || "нет"}
+
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}${schoolSection}
 
-Составь JSON-план из 3 ужинов: dinners, единый shopping-список для дня 1${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ».`;
+Составь JSON-план из 3 ужинов: dinners, единый shopping-список для дня 1${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ». Используй остатки из «ОСТАЛОСЬ ГОТОВОЕ» в первую очередь.`;
 }
 
 async function callLLMOnce(
@@ -522,13 +541,21 @@ async function dinnerAdvice(
   );
 
   const memberIds = (memberRows ?? []).map((r) => r.user_id as string);
-  const { data: triedRows } = await db
-    .from("tried_foods")
-    .select("dish, verdict")
-    .in("user_id", memberIds);
+  const [{ data: triedRows }, { data: leftoverRows }] = await Promise.all([
+    db
+      .from("tried_foods")
+      .select("dish, verdict")
+      .in("user_id", memberIds),
+    db.from("leftovers").select("dish, amount, cooked_on").eq("family_id", familyId),
+  ]);
   const banned = computeBanned(triedRows ?? []);
+  const leftovers: LeftoverInfo[] = (leftoverRows ?? []).map((r) => ({
+    dish: String(r.dish ?? ""),
+    amount: r.amount != null ? String(r.amount) : null,
+    cooked_on: r.cooked_on != null ? String(r.cooked_on) : null,
+  }));
 
-  const prompt = buildDinnerPrompt(familyName, members, date, banned);
+  const prompt = buildDinnerPrompt(familyName, members, date, banned, leftovers);
   const content = await callLLM(DINNER_SYSTEM_PROMPT, prompt, {
     maxTokens: 4000,
     json: true,
