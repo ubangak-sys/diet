@@ -172,22 +172,26 @@ export default function AdvicePage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-stone-500">
             {tab === "dinner"
-              ? "Что приготовить на общий семейный ужин + список покупок."
+              ? isParent
+                ? "Что приготовить на общий семейный ужин + список покупок."
+                : "План ужинов составляет мама/папа."
               : selectedKid
                 ? `Персональный совет для: ${selectedKid.full_name || "ребёнка"}.`
                 : "Персональный совет с учётом ваших предпочтений и меню."}
           </p>
-          <button
-            onClick={() => generate(tab)}
-            disabled={generating}
-            className="btn-primary"
-          >
-            {generating
-              ? "ИИ думает…"
-              : currentList.some((a) => a.advice_date === today)
-                ? "Обновить на сегодня"
-                : "Получить на сегодня"}
-          </button>
+          {(tab !== "dinner" || isParent) && (
+            <button
+              onClick={() => generate(tab)}
+              disabled={generating}
+              className="btn-primary"
+            >
+              {generating
+                ? "ИИ думает…"
+                : currentList.some((a) => a.advice_date === today)
+                  ? "Обновить на сегодня"
+                  : "Получить на сегодня"}
+            </button>
+          )}
         </div>
       )}
 

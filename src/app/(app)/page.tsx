@@ -109,6 +109,8 @@ export default function DashboardPage() {
     family?.members.some(
       (m) => m.member_role === "mom" || m.member_role === "dad",
     ) ?? false;
+  const me = family?.members.find((m) => m.user_id === user?.id);
+  const isParent = me?.member_role === "mom" || me?.member_role === "dad";
 
   return (
     <div className="space-y-6">
@@ -131,7 +133,7 @@ export default function DashboardPage() {
                 : "Объединитесь в семью, чтобы получать рекомендации по ужину."}
             </p>
           </div>
-          {family && (
+          {family && isParent && (
             <div className="flex items-center gap-3">
               <Link
                 href="/preferences"
@@ -205,7 +207,9 @@ export default function DashboardPage() {
           </div>
         ) : (
           <p className="mt-3 text-sm text-stone-500">
-            Рекомендации пока нет — нажмите «Получить рекомендацию».
+            {isParent
+              ? "Рекомендации пока нет — нажмите «Получить рекомендацию»."
+              : "Рекомендации пока нет."}
           </p>
         )}
       </section>

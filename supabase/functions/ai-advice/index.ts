@@ -472,11 +472,14 @@ async function dinnerAdvice(
 ): Promise<Row> {
   const { data: myMembership, error: mErr } = await db
     .from("family_members")
-    .select("family_id")
+    .select("family_id, member_role")
     .eq("user_id", userId)
     .single();
   if (mErr || !myMembership) {
     throw new Error("Вы не состоите в семье");
+  }
+  if (myMembership.member_role === "kid") {
+    throw new Error("Только родители (мама/папа) могут запрашивать план ужинов");
   }
   const familyId = myMembership.family_id as string;
 
