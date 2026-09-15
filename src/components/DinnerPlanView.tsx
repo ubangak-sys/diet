@@ -26,16 +26,19 @@ export function DinnerPlanView({
     if (user) setForUserId(user.id);
   }, [user]);
 
-  const [checked, setChecked] = useState<Set<number>>(() => {
+  const [checked, setChecked] = useState<Set<number>>(new Set());
+  const [verdicts, setVerdicts] = useState<Record<number, "liked" | "disliked">>(
+    {},
+  );
+
+  useEffect(() => {
     const s = new Set<number>();
     plan.shopping.forEach((item, i) => {
       if (item.checked) s.add(i);
     });
-    return s;
-  });
-  const [verdicts, setVerdicts] = useState<Record<number, "liked" | "disliked">>(
-    {},
-  );
+    setChecked(s);
+    setVerdicts({});
+  }, [plan]);
 
   async function toggle(i: number) {
     setChecked((prev) => {

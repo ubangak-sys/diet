@@ -445,7 +445,7 @@ async function personalAdvice(
       .eq("user_id", userId)
       .order("entry_date", { ascending: false })
       .limit(30),
-    db.from("tried_foods").select("dish, verdict").eq("user_id", userId),
+    db.from("tried_foods").select("dish, verdict, created_at").eq("user_id", userId),
   ]);
 
   const paused = computePaused(triedRes.data ?? [], PAUSE_DAYS);
@@ -546,7 +546,7 @@ async function dinnerAdvice(
   const [{ data: triedRows }, { data: leftoverRows }] = await Promise.all([
     db
       .from("tried_foods")
-      .select("dish, verdict")
+      .select("dish, verdict, created_at")
       .in("user_id", memberIds),
     db.from("leftovers").select("dish, amount, cooked_on").eq("family_id", familyId),
   ]);

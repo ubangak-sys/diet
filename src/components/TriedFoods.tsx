@@ -21,7 +21,12 @@ export function TriedFoods() {
   const [loading, setLoading] = useState(true);
 
   const members = family?.members ?? [];
-  const ids = members.map((m) => m.user_id);
+  const ids =
+    members.length > 0
+      ? members.map((m) => m.user_id)
+      : user
+        ? [user.id]
+        : [];
 
   const nameOf = (id: string): string => {
     if (id === user?.id) return "Вы";
