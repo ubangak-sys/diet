@@ -194,7 +194,7 @@ export default function LogPage() {
             className="btn-secondary !px-3 !py-1.5"
             title="Скопировать выбранный приём пищи для выбранного человека с предыдущего дня"
           >
-            📋 Скопировать предыдущий день
+            📋 Скопировать прошлый приём
           </button>
           <input
             type="date"

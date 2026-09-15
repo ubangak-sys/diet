@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
+import { useFamily } from "./FamilyProvider";
 import { FeedbackModal } from "./FeedbackModal";
 
 const NAV = [
@@ -16,6 +17,7 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  const { error: familyError } = useFamily();
   const pathname = usePathname();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -66,6 +68,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </nav>
         </div>
       </header>
+
+      {familyError && (
+        <div className="mx-auto w-full max-w-5xl px-4 pt-3">
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            Не удалось загрузить данные семьи: {familyError}
+          </p>
+        </div>
+      )}
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-6">
         {children}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useFamily } from "./FamilyProvider";
 import { supabase } from "@/lib/supabase";
+import { todayLocal } from "@/lib/utils";
 
 interface Leftover {
   id: string;
@@ -17,6 +18,7 @@ export function Leftovers() {
   const [items, setItems] = useState<Leftover[]>([]);
   const [dish, setDish] = useState("");
   const [amount, setAmount] = useState("");
+  const [cookedOn, setCookedOn] = useState(todayLocal());
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
 
@@ -47,11 +49,13 @@ export function Leftovers() {
       family_id: familyId,
       dish: dish.trim(),
       amount: amount.trim() || null,
+      cooked_on: cookedOn || null,
     });
     setBusy(false);
     if (!error) {
       setDish("");
       setAmount("");
+      setCookedOn(todayLocal());
       await load();
     }
   }
@@ -103,6 +107,12 @@ export function Leftovers() {
                 {it.amount && (
                   <span className="text-stone-500"> — {it.amount}</span>
                 )}
+                {it.cooked_on && (
+                  <span className="text-stone-400">
+                    {" "}
+                    · сварен {it.cooked_on}
+                  </span>
+                )}
               </span>
               <button
                 onClick={() => remove(it.id)}
@@ -116,7 +126,7 @@ export function Leftovers() {
         </ul>
       )}
 
-      <form onSubmit={add} className="mt-3 flex flex-wrap gap-2">
+      <form onSubmit={add} className="mt-3 flex flex-wrap items-center gap-2">
         <input
           value={dish}
           onChange={(e) => setDish(e.target.value)}
@@ -128,6 +138,13 @@ export function Leftovers() {
           onChange={(e) => setAmount(e.target.value)}
           placeholder="2 порции"
           className="input w-28"
+        />
+        <input
+          type="date"
+          value={cookedOn}
+          onChange={(e) => setCookedOn(e.target.value)}
+          className="input w-auto"
+          title="Когда сварено"
         />
         <button
           type="submit"

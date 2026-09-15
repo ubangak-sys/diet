@@ -155,6 +155,12 @@ apps/diet/
 │   ├── migrations/0003_dinner_roles.sql # роли/возраст + ужин
 │   ├── migrations/0004_parent_children.sql # родители правят детей
 │   ├── migrations/0005_feedback_wishes.sql # пожелания/отзывы/советы детей
+│   ├── migrations/0006_security.sql  # права + запрет записи советов с клиента
+│   ├── migrations/0007_dinner_plan_invite.sql # JSON-план + ротация кода
+│   ├── migrations/0008_tried_foods.sql # вердикты по блюдам
+│   ├── migrations/0009_shopping_checks.sql # синхронизация чекбоксов покупок
+│   ├── migrations/0010_leftovers.sql # остатки готовых блюд
+│   ├── migrations/0011_fixes.sql     # фикс set_family_role + уникальность вердиктов
 │   ├── functions/ai-advice/index.ts  # Edge Function ИИ (личный + ужин)
 │   ├── functions/send-feedback/index.ts # Edge Function обратной связи
 │   └── config.toml

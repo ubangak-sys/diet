@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "./AuthProvider";
+import { useFamily } from "./FamilyProvider";
 import { supabase } from "@/lib/supabase";
+import { recordVerdict } from "@/lib/tried";
 import type { DinnerPlan } from "@/lib/types";
 
 export function DinnerPlanView({
@@ -13,6 +15,17 @@ export function DinnerPlanView({
   adviceId?: string;
 }) {
   const { user } = useAuth();
+  const { family } = useFamily();
+  const members = family?.members ?? [];
+  const me = members.find((m) => m.user_id === user?.id);
+  const isParent = me?.member_role === "mom" || me?.member_role === "dad";
+  const kids = members.filter((m) => m.member_role === "kid");
+  const [forUserId, setForUserId] = useState("");
+
+  useEffect(() => {
+    if (user) setForUserId(user.id);
+  }, [user]);
+
   const [checked, setChecked] = useState<Set<number>>(() => {
     const s = new Set<number>();
     plan.shopping.forEach((item, i) => {
@@ -40,17 +53,31 @@ export function DinnerPlanView({
   }
 
   async function mark(i: number, dish: string, verdict: "liked" | "disliked") {
-    if (!user) return;
+    if (!forUserId) return;
     setVerdicts((prev) => ({ ...prev, [i]: verdict }));
-    await supabase.from("tried_foods").insert({
-      user_id: user.id,
-      dish,
-      verdict,
-    });
+    await recordVerdict(forUserId, dish, verdict);
   }
 
   return (
     <div className="space-y-4">
+      {isParent && kids.length > 0 && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-stone-500">Кто пробовал:</span>
+          <select
+            value={forUserId}
+            onChange={(e) => setForUserId(e.target.value)}
+            className="input !w-auto !py-1 text-xs"
+          >
+            <option value={user!.id}>Вы</option>
+            {kids.map((k) => (
+              <option key={k.user_id} value={k.user_id}>
+                {k.full_name || k.email || "Ребёнок"}
+              </option>
+            ))}
+          </select>
+        </div>
+      )}
+
       {plan.dinners.length > 0 && (
         <div>
           <h3 className="mb-2 font-semibold">🍽️ Ужины</h3>

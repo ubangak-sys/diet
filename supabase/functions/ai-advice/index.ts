@@ -37,7 +37,7 @@ const SYSTEM_PROMPT = `Ты — персональный нутрициолог.
 5. Для каждого совета укажи: что это, почему это полезно именно ему, и в какой приём пищи логично добавить.
 6. Будь конкретным, но кратким. Не давай медицинских диагнозов и не назначай лечение.
 7. Оформи ответ как структурированный список с эмодзи.
-8. Никогда не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.`;
+8. Никогда не предлагай блюда из списка «ПАУЗА» (недавно не понравилось) в запросе.`;
 
 const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нутрициолог. Составь ПЛАН из 3 ужинов для всей семьи.
 
@@ -77,13 +77,15 @@ const DINNER_SYSTEM_PROMPT = `Ты — семейный кулинар и нут
 7. shopping — список покупок ТОЛЬКО для дня 1, с количеством.
 8. lunchboxes — только для школьников старше 7 лет; для каждого — items (что положить) и note (совет); если таких нет, верни пустой массив.
 9. «Пожелания по ужину» — мягкие, учитывай при возможности.
-10. Не предлагай блюда из списка «НЕ ПРЕДЛАГАТЬ» в запросе.
+10. Не предлагай блюда из списка «ПАУЗА» (недавно не понравилось) в запросе.
 11. Используй остатки из «ОСТАЛОСЬ ГОТОВОЕ» в первую очередь: запланируй их на ближайшие ужины (разогреть + лёгкий гарнир/салат), не предлагай готовить то же заново и сократи список покупок.`;
 
 type Row = Record<string, unknown>;
 
 // Минимальный интервал между генерациями одного совета (защита от спама кнопкой «Обновить»)
 const MIN_INTERVAL_MS = Number(Deno.env.get("AI_MIN_INTERVAL_MS") || "300000");
+// На сколько дней ставить «паузу» блюду после одного «не зашло»
+const PAUSE_DAYS = Number(Deno.env.get("AI_PAUSE_DAYS") || "14");
 
 interface DinnerPlanItem {
   day?: number | string;
@@ -189,27 +191,24 @@ function parseDinnerPlan(text: string): DinnerPlan | null {
   return null;
 }
 
-function computeBanned(tried: Row[]): string[] {
-  const counts = new Map<string, { liked: number; disliked: number }>();
+function computePaused(tried: Row[], pauseDays: number): string[] {
+  const cutoff = Date.now() - pauseDays * 24 * 3600 * 1000;
+  const paused = new Set<string>();
   for (const t of tried) {
-    const dish = String(t.dish ?? "").trim();
-    if (!dish) continue;
-    const c = counts.get(dish) ?? { liked: 0, disliked: 0 };
-    if (t.verdict === "liked") c.liked++;
-    else if (t.verdict === "disliked") c.disliked++;
-    counts.set(dish, c);
+    if (t.verdict !== "disliked") continue;
+    const ts = new Date(String(t.created_at ?? "")).getTime();
+    if (!Number.isNaN(ts) && ts >= cutoff) {
+      paused.add(String(t.dish ?? "").trim());
+    }
   }
-  // Бан только после >=5 «не зашло» (и «не зашло» больше, чем «зашло»)
-  return [...counts.entries()]
-    .filter(([, c]) => c.disliked >= 5 && c.disliked > c.liked)
-    .map(([dish]) => dish);
+  return [...paused];
 }
 
 function buildPersonalPrompt(
   prefs: Row | null,
   meals: Row[],
   date: string,
-  banned: string[],
+  paused: string[],
 ): string {
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
 
@@ -235,12 +234,12 @@ function buildPersonalPrompt(
 Ограничения в питании: ${restrictions.length ? restrictions.join(", ") : "нет"}
 Цель: ${goal || "расширить рацион"}
 Дополнительные заметки: ${notes || "нет"}
-НЕ ПРЕДЛАГАТЬ (отвергнуто много раз): ${banned.length ? banned.join(", ") : "нет"}
+ПАУЗА (недавно не понравилось): ${paused.length ? paused.join(", ") : "нет"}
 
 === ФАКТИЧЕСКОЕ МЕНЮ (последние записи) ===
 ${mealLines || "записей пока нет"}
 
-Составь персональный совет по расширению рациона на указанную дату. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ».`;
+Составь персональный совет по расширению рациона на указанную дату. Не предлагай блюда из «ПАУЗА».`;
 }
 
 interface MemberData {
@@ -261,7 +260,7 @@ function buildDinnerPrompt(
   familyName: string,
   members: MemberData[],
   date: string,
-  banned: string[],
+  paused: string[],
   leftovers: LeftoverInfo[],
 ): string {
   const arr = (v: unknown): string[] => (Array.isArray(v) ? v.map(String) : []);
@@ -313,7 +312,7 @@ function buildDinnerPrompt(
 === ОБЩИЕ ОГРАНИЧЕНИЯ (жёсткий запрет для всех блюд) ===
 Аллергии/непереносимость: ${[...allAllergies].join(", ") || "нет"}
 Ограничения в питании: ${[...allRestrictions].join(", ") || "нет"}
-НЕ ПРЕДЛАГАТЬ (отвергнуто много раз): ${banned.length ? banned.join(", ") : "нет"}
+ПАУЗА (недавно не понравилось): ${paused.length ? paused.join(", ") : "нет"}
 
 === ОСТАЛОСЬ ГОТОВОЕ (нужно доесть в первую очередь) ===
 ${leftoverLines || "нет"}
@@ -321,7 +320,7 @@ ${leftoverLines || "нет"}
 === ЧЛЕНЫ СЕМЬИ ===
 ${memberLines}${schoolSection}
 
-Составь JSON-план из 3 ужинов: dinners, единый shopping-список для дня 1${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «НЕ ПРЕДЛАГАТЬ». Используй остатки из «ОСТАЛОСЬ ГОТОВОЕ» в первую очередь.`;
+Составь JSON-план из 3 ужинов: dinners, единый shopping-список для дня 1${schoolKids.length > 0 ? " и lunchboxes для школьников" : ""}. Учти «Пожелания по ужину», но они вторичны по отношению к совместимости. Не предлагай блюда из «ПАУЗА». Используй остатки из «ОСТАЛОСЬ ГОТОВОЕ» в первую очередь.`;
 }
 
 async function callLLMOnce(
@@ -449,8 +448,8 @@ async function personalAdvice(
     db.from("tried_foods").select("dish, verdict").eq("user_id", userId),
   ]);
 
-  const banned = computeBanned(triedRes.data ?? []);
-  const prompt = buildPersonalPrompt(prefsRes.data ?? null, mealsRes.data ?? [], date, banned);
+  const paused = computePaused(triedRes.data ?? [], PAUSE_DAYS);
+  const prompt = buildPersonalPrompt(prefsRes.data ?? null, mealsRes.data ?? [], date, paused);
   const content = await callLLM(SYSTEM_PROMPT, prompt);
 
   const { data, error } = await db
@@ -548,14 +547,14 @@ async function dinnerAdvice(
       .in("user_id", memberIds),
     db.from("leftovers").select("dish, amount, cooked_on").eq("family_id", familyId),
   ]);
-  const banned = computeBanned(triedRows ?? []);
+  const paused = computePaused(triedRows ?? [], PAUSE_DAYS);
   const leftovers: LeftoverInfo[] = (leftoverRows ?? []).map((r) => ({
     dish: String(r.dish ?? ""),
     amount: r.amount != null ? String(r.amount) : null,
     cooked_on: r.cooked_on != null ? String(r.cooked_on) : null,
   }));
 
-  const prompt = buildDinnerPrompt(familyName, members, date, banned, leftovers);
+  const prompt = buildDinnerPrompt(familyName, members, date, paused, leftovers);
   const content = await callLLM(DINNER_SYSTEM_PROMPT, prompt, {
     maxTokens: 4000,
     json: true,
