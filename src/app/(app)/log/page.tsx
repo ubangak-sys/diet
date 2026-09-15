@@ -143,15 +143,18 @@ export default function LogPage() {
   async function copyPreviousDay() {
     if (!user) return;
     const prev = addDays(date, -1);
+    const target = isParent && kids.length > 0 ? forUserId : user.id;
     const { data } = await supabase
       .from("meal_entries")
       .select("*")
-      .eq("entry_date", prev);
-    const items = (data ?? []).filter(
-      (e) => e.user_id === user.id || (isParent && kidsSet.has(e.user_id)),
-    );
+      .eq("entry_date", prev)
+      .eq("meal_type", mealType)
+      .eq("user_id", target);
+    const items = data ?? [];
     if (items.length === 0) {
-      setError("В предыдущий день нет записей, доступных для копирования.");
+      setError(
+        "В предыдущий день для выбранного человека и приёма пищи записей нет.",
+      );
       return;
     }
     setSaving(true);
@@ -189,7 +192,7 @@ export default function LogPage() {
             onClick={copyPreviousDay}
             disabled={saving}
             className="btn-secondary !px-3 !py-1.5"
-            title="Скопировать записи предыдущего дня"
+            title="Скопировать выбранный приём пищи для выбранного человека с предыдущего дня"
           >
             📋 Скопировать предыдущий день
           </button>
@@ -354,7 +357,7 @@ export default function LogPage() {
                           {canDelete(e) && (
                             <button
                               onClick={() => removeEntry(e.id)}
-                              className="text-xs text-stone-400 opacity-0 transition hover:text-red-500 group-hover:opacity-100"
+                              className="text-xs text-stone-400 transition hover:text-red-500"
                               title="Удалить"
                             >
                               ✕
