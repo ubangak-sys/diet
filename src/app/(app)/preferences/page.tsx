@@ -290,6 +290,7 @@ export default function PreferencesPage() {
               </label>
               <textarea
                 id="liked"
+                autoComplete="off"
                 className="input min-h-[90px]"
                 value={liked}
                 onChange={(e) => setLiked(e.target.value)}
@@ -305,6 +306,7 @@ export default function PreferencesPage() {
               </label>
               <textarea
                 id="disliked"
+                autoComplete="off"
                 className="input min-h-[90px]"
                 value={disliked}
                 onChange={(e) => setDisliked(e.target.value)}
@@ -320,6 +322,7 @@ export default function PreferencesPage() {
               </label>
               <textarea
                 id="cuisines"
+                autoComplete="off"
                 className="input min-h-[90px]"
                 value={cuisines}
                 onChange={(e) => setCuisines(e.target.value)}
@@ -332,6 +335,7 @@ export default function PreferencesPage() {
               </label>
               <textarea
                 id="allergies"
+                autoComplete="off"
                 className="input min-h-[90px]"
                 value={allergies}
                 onChange={(e) => setAllergies(e.target.value)}
@@ -371,6 +375,7 @@ export default function PreferencesPage() {
               <input
                 id="goal"
                 type="text"
+                autoComplete="off"
                 className="input"
                 value={goal}
                 onChange={(e) => setGoal(e.target.value)}
@@ -384,6 +389,7 @@ export default function PreferencesPage() {
               <input
                 id="notes"
                 type="text"
+                autoComplete="off"
                 className="input"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
@@ -398,6 +404,7 @@ export default function PreferencesPage() {
             </label>
             <textarea
               id="dinnerWishes"
+              autoComplete="off"
               className="input min-h-[80px]"
               value={dinnerWishes}
               onChange={(e) => setDinnerWishes(e.target.value)}

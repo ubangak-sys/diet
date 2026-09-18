@@ -175,6 +175,7 @@ export default function FamilyPage() {
                 id="famName"
                 type="text"
                 required
+                autoComplete="off"
                 className="input"
                 value={newName}
                 onChange={(e) => setNewName(e.target.value)}
@@ -216,6 +217,7 @@ export default function FamilyPage() {
                 id="joinCode"
                 type="text"
                 required
+                autoComplete="off"
                 className="input uppercase"
                 value={joinCode}
                 onChange={(e) => setJoinCode(e.target.value)}

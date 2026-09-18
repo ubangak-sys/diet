@@ -299,6 +299,7 @@ export default function LogPage() {
               id="dish"
               type="text"
               required
+              autoComplete="off"
               className="input"
               value={dishName}
               onChange={(e) => setDishName(e.target.value)}
@@ -336,6 +337,7 @@ export default function LogPage() {
             </label>
             <textarea
               id="notes"
+              autoComplete="off"
               className="input min-h-[70px]"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}

@@ -131,12 +131,14 @@ export function Leftovers() {
           value={dish}
           onChange={(e) => setDish(e.target.value)}
           placeholder="Блюдо, напр. борщ"
+          autoComplete="off"
           className="input flex-1"
         />
         <input
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           placeholder="2 порции"
+          autoComplete="off"
           className="input w-28"
         />
         <input
