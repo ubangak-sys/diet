@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "./AuthProvider";
 import { useFamily } from "./FamilyProvider";
+import { Avatar } from "./Avatar";
 import { FeedbackModal } from "./FeedbackModal";
 
 const NAV = [
@@ -17,7 +18,8 @@ const NAV = [
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
-  const { error: familyError } = useFamily();
+  const { family, error: familyError } = useFamily();
+  const me = family?.members.find((m) => m.user_id === user?.id);
   const pathname = usePathname();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
 
@@ -32,6 +34,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </Link>
 
             <div className="flex items-center gap-3">
+              {me && (
+                <Avatar
+                  emoji={me.avatar_emoji}
+                  color={me.avatar_color}
+                  role={me.member_role}
+                  size="sm"
+                />
+              )}
               <span className="hidden text-sm text-stone-500 md:inline">
                 {user?.email}
               </span>

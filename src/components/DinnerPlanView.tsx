@@ -71,10 +71,14 @@ export function DinnerPlanView({
             onChange={(e) => setForUserId(e.target.value)}
             className="input !w-auto !py-1 text-xs"
           >
-            <option value={user!.id}>Вы</option>
+            <option value={user!.id}>
+              {me?.avatar_emoji ? `${me.avatar_emoji} ` : ""}Вы
+            </option>
             {kids.map((k) => (
               <option key={k.user_id} value={k.user_id}>
-                {k.full_name || k.email || "Ребёнок"}
+                {`${k.avatar_emoji ? k.avatar_emoji + " " : ""}${
+                  k.full_name || k.email || "Ребёнок"
+                }`}
               </option>
             ))}
           </select>

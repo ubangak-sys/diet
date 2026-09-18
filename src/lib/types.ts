@@ -5,6 +5,8 @@ export interface Profile {
   email: string | null;
   full_name: string | null;
   age: number | null;
+  avatar_emoji: string | null;
+  avatar_color: string | null;
   created_at: string;
 }
 
@@ -61,6 +63,22 @@ export const DIETARY_OPTIONS = [
   "Спортивное питание",
 ] as const;
 
+// Аватарки: эмодзи + цвет фона
+export const AVATAR_EMOJIS = [
+  "🦊", "🐻", "🐼", "🐨", "🐯", "🦁", "🐮", "🐷",
+  "🐸", "🐵", "🐰", "🐹", "🐧", "🦉", "🦄", "🐢",
+  "🐙", "🦋", "🌸", "🌟", "🍀", "🍓", "🍋", "🥑",
+];
+
+export const AVATAR_COLORS = [
+  "#d1fae5",
+  "#dbeafe",
+  "#fef3c7",
+  "#fce7f3",
+  "#ede9fe",
+  "#ffe4e6",
+];
+
 export type FamilyRole = "owner" | "member";
 export type FamilyMemberRole = "mom" | "dad" | "kid";
 
@@ -84,6 +102,8 @@ export interface FamilyMember {
   full_name: string;
   email: string;
   age: number | null;
+  avatar_emoji: string | null;
+  avatar_color: string | null;
   joined_at: string;
 }
 

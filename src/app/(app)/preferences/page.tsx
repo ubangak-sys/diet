@@ -4,7 +4,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { useFamily } from "@/components/FamilyProvider";
-import { DIETARY_OPTIONS, Preferences } from "@/lib/types";
+import { Avatar } from "@/components/Avatar";
+import {
+  AVATAR_COLORS,
+  AVATAR_EMOJIS,
+  DIETARY_OPTIONS,
+  Preferences,
+} from "@/lib/types";
 import { arrayToText, textToArray } from "@/lib/utils";
 
 const EMPTY: Preferences = {
@@ -28,6 +34,8 @@ export default function PreferencesPage() {
 
   const [fullName, setFullName] = useState("");
   const [age, setAge] = useState("");
+  const [avatarEmoji, setAvatarEmoji] = useState("");
+  const [avatarColor, setAvatarColor] = useState("");
 
   const [liked, setLiked] = useState("");
   const [disliked, setDisliked] = useState("");
@@ -47,6 +55,9 @@ export default function PreferencesPage() {
   const isParent = me?.member_role === "mom" || me?.member_role === "dad";
   const kids = members.filter((m) => m.member_role === "kid");
   const editingChild = !!selectedUserId && selectedUserId !== user?.id;
+  const selectedRole = members.find(
+    (m) => m.user_id === selectedUserId,
+  )?.member_role;
 
   useEffect(() => {
     if (user) setSelectedUserId(user.id);
@@ -58,7 +69,7 @@ export default function PreferencesPage() {
     Promise.all([
       supabase
         .from("profiles")
-        .select("full_name, age")
+        .select("full_name, age, avatar_emoji, avatar_color")
         .eq("id", selectedUserId)
         .maybeSingle(),
       supabase
@@ -70,6 +81,8 @@ export default function PreferencesPage() {
       const prof = profileRes.data;
       setFullName(prof?.full_name ?? "");
       setAge(prof?.age != null ? String(prof.age) : "");
+      setAvatarEmoji(prof?.avatar_emoji ?? "");
+      setAvatarColor(prof?.avatar_color ?? "");
 
       const p = (prefsRes.data ?? EMPTY) as Preferences;
       setLiked(arrayToText(p.liked_dishes));
@@ -98,9 +111,18 @@ export default function PreferencesPage() {
 
     const ageNum = age.trim() ? Number(age) : null;
 
+    const avatarFields = {
+      avatar_emoji: avatarEmoji || null,
+      avatar_color: avatarColor || null,
+    };
+
     const profileUpdate = editingChild
-      ? { age: ageNum }
-      : { full_name: fullName.trim() || null, age: ageNum };
+      ? { age: ageNum, ...avatarFields }
+      : {
+          full_name: fullName.trim() || null,
+          age: ageNum,
+          ...avatarFields,
+        };
 
     const profileRes = await supabase
       .from("profiles")
@@ -203,6 +225,56 @@ export default function PreferencesPage() {
                 onChange={(e) => setAge(e.target.value)}
                 placeholder="Например: 34"
               />
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <span className="label">Аватар</span>
+            <div className="flex flex-wrap items-start gap-4">
+              <Avatar
+                emoji={avatarEmoji}
+                color={avatarColor}
+                role={selectedRole}
+                size="lg"
+              />
+              <div className="min-w-[200px] flex-1 space-y-2">
+                <div className="flex flex-wrap gap-1">
+                  {AVATAR_EMOJIS.map((e) => (
+                    <button
+                      key={e}
+                      type="button"
+                      onClick={() => setAvatarEmoji(avatarEmoji === e ? "" : e)}
+                      className={`rounded-lg border px-1.5 py-1 text-lg leading-none transition ${
+                        avatarEmoji === e
+                          ? "border-brand-500 bg-brand-50"
+                          : "border-stone-200 hover:bg-stone-50"
+                      }`}
+                    >
+                      {e}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {AVATAR_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setAvatarColor(avatarColor === c ? "" : c)}
+                      className={`h-7 w-7 rounded-full border-2 transition ${
+                        avatarColor === c
+                          ? "border-stone-700"
+                          : "border-transparent"
+                      }`}
+                      style={{ backgroundColor: c }}
+                      title={c}
+                    />
+                  ))}
+                </div>
+                <p className="text-xs text-stone-400">
+                  Повторное нажатие снимает выбор — тогда показывается иконка по
+                  роли.
+                </p>
+              </div>
             </div>
           </div>
         </div>

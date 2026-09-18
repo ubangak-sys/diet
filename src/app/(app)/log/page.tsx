@@ -4,13 +4,8 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { useFamily } from "@/components/FamilyProvider";
-import {
-  FAMILY_ROLES,
-  MEAL_TYPES,
-  MealEntry,
-  MealType,
-  mealTypeLabel,
-} from "@/lib/types";
+import { Avatar } from "@/components/Avatar";
+import { MEAL_TYPES, MealEntry, MealType, mealTypeLabel } from "@/lib/types";
 import { addDays, formatDateRu, todayLocal } from "@/lib/utils";
 
 export default function LogPage() {
@@ -39,15 +34,20 @@ export default function LogPage() {
     if (user) setForUserIds([user.id]);
   }, [user]);
 
-  const roleEmoji = (role?: string): string =>
-    FAMILY_ROLES.find((r) => r.value === role)?.emoji ?? "👤";
-
   const forOptions = [
-    { id: user?.id ?? "", name: "Вы", emoji: roleEmoji(me?.member_role) },
+    {
+      id: user?.id ?? "",
+      name: "Вы",
+      role: me?.member_role,
+      avatar_emoji: me?.avatar_emoji ?? null,
+      avatar_color: me?.avatar_color ?? null,
+    },
     ...kids.map((k) => ({
       id: k.user_id,
       name: k.full_name || k.email || "Ребёнок",
-      emoji: roleEmoji(k.member_role),
+      role: k.member_role,
+      avatar_emoji: k.avatar_emoji,
+      avatar_color: k.avatar_color,
     })),
   ].filter((o) => o.id);
 
@@ -244,7 +244,12 @@ export default function LogPage() {
                           : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
                       }`}
                     >
-                      <span className="text-lg leading-none">{o.emoji}</span>
+                      <Avatar
+                        emoji={o.avatar_emoji}
+                        color={o.avatar_color}
+                        role={o.role}
+                        size="sm"
+                      />
                       <span>{o.name}</span>
                     </button>
                   );
