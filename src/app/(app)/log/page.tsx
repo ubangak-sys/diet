@@ -5,6 +5,7 @@ import { useAuth } from "@/components/AuthProvider";
 import { supabase } from "@/lib/supabase";
 import { useFamily } from "@/components/FamilyProvider";
 import {
+  FAMILY_ROLES,
   MEAL_TYPES,
   MealEntry,
   MealType,
@@ -22,7 +23,7 @@ export default function LogPage() {
   const [recentDishes, setRecentDishes] = useState<string[]>([]);
 
   const [mealType, setMealType] = useState<MealType>("breakfast");
-  const [forUserId, setForUserId] = useState("");
+  const [forUserIds, setForUserIds] = useState<string[]>([]);
   const [dishName, setDishName] = useState("");
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
@@ -35,8 +36,26 @@ export default function LogPage() {
   const kidsSet = new Set(kids.map((k) => k.user_id));
 
   useEffect(() => {
-    if (user) setForUserId(user.id);
+    if (user) setForUserIds([user.id]);
   }, [user]);
+
+  const roleEmoji = (role?: string): string =>
+    FAMILY_ROLES.find((r) => r.value === role)?.emoji ?? "👤";
+
+  const forOptions = [
+    { id: user?.id ?? "", name: "Вы", emoji: roleEmoji(me?.member_role) },
+    ...kids.map((k) => ({
+      id: k.user_id,
+      name: k.full_name || k.email || "Ребёнок",
+      emoji: roleEmoji(k.member_role),
+    })),
+  ].filter((o) => o.id);
+
+  function toggleFor(id: string) {
+    setForUserIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
 
   async function loadEntries() {
     if (!user) return;
@@ -114,16 +133,22 @@ export default function LogPage() {
   async function addEntry(e: React.FormEvent) {
     e.preventDefault();
     if (!dishName.trim()) return;
+    const targets =
+      isParent && kids.length > 0 ? forUserIds : user ? [user.id] : [];
+    if (targets.length === 0) {
+      setError("Выберите, для кого добавить приём пищи.");
+      return;
+    }
     setSaving(true);
     setError("");
-    const target = isParent && kids.length > 0 ? forUserId : user!.id;
-    const { error } = await supabase.from("meal_entries").insert({
-      user_id: target,
+    const rows = targets.map((uid) => ({
+      user_id: uid,
       entry_date: date,
       meal_type: mealType,
       dish_name: dishName.trim(),
       notes: notes.trim() || null,
-    });
+    }));
+    const { error } = await supabase.from("meal_entries").insert(rows);
     setSaving(false);
     if (error) {
       setError(error.message);
@@ -142,18 +167,22 @@ export default function LogPage() {
 
   async function copyPreviousDay() {
     if (!user) return;
+    const targets = isParent && kids.length > 0 ? forUserIds : [user.id];
+    if (targets.length === 0) {
+      setError("Выберите, для кого скопировать.");
+      return;
+    }
     const prev = addDays(date, -1);
-    const target = isParent && kids.length > 0 ? forUserId : user.id;
     const { data } = await supabase
       .from("meal_entries")
       .select("*")
       .eq("entry_date", prev)
       .eq("meal_type", mealType)
-      .eq("user_id", target);
+      .in("user_id", targets);
     const items = data ?? [];
     if (items.length === 0) {
       setError(
-        "В предыдущий день для выбранного человека и приёма пищи записей нет.",
+        "В предыдущий день для выбранных людей и приёма пищи записей нет.",
       );
       return;
     }
@@ -200,22 +229,30 @@ export default function LogPage() {
 
           {isParent && kids.length > 0 && (
             <div>
-              <label htmlFor="forUserId" className="label">
-                Для кого
-              </label>
-              <select
-                id="forUserId"
-                className="input"
-                value={forUserId}
-                onChange={(e) => setForUserId(e.target.value)}
-              >
-                <option value={user!.id}>Вы</option>
-                {kids.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.full_name || m.email || "Ребёнок"}
-                  </option>
-                ))}
-              </select>
+              <span className="label">Для кого</span>
+              <div className="flex flex-wrap gap-2">
+                {forOptions.map((o) => {
+                  const active = forUserIds.includes(o.id);
+                  return (
+                    <button
+                      key={o.id}
+                      type="button"
+                      onClick={() => toggleFor(o.id)}
+                      className={`flex items-center gap-2 rounded-full border px-3 py-1.5 text-sm transition ${
+                        active
+                          ? "border-brand-500 bg-brand-50 text-brand-700"
+                          : "border-stone-300 bg-white text-stone-600 hover:bg-stone-50"
+                      }`}
+                    >
+                      <span className="text-lg leading-none">{o.emoji}</span>
+                      <span>{o.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+              <p className="mt-1 text-xs text-stone-400">
+                Можно выбрать нескольких — запись добавится каждому.
+              </p>
             </div>
           )}
 
@@ -244,7 +281,7 @@ export default function LogPage() {
             onClick={copyPreviousDay}
             disabled={saving}
             className="btn-secondary w-full"
-            title="Скопировать выбранный приём пищи для выбранного человека с предыдущего дня"
+            title="Скопировать выбранный приём пищи для выбранных людей с предыдущего дня"
           >
             📋 Скопировать прошлый приём
           </button>
