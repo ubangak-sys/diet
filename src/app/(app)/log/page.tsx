@@ -239,6 +239,16 @@ export default function LogPage() {
             </div>
           </div>
 
+          <button
+            type="button"
+            onClick={copyPreviousDay}
+            disabled={saving}
+            className="btn-secondary w-full"
+            title="Скопировать выбранный приём пищи для выбранного человека с предыдущего дня"
+          >
+            📋 Скопировать прошлый приём
+          </button>
+
           <div>
             <label htmlFor="dish" className="label">
               Блюдо / продукты
@@ -297,20 +307,9 @@ export default function LogPage() {
             </p>
           )}
 
-          <div className="flex gap-2">
-            <button type="submit" disabled={saving} className="btn-primary flex-1">
-              {saving ? "Сохраняем…" : "Добавить"}
-            </button>
-            <button
-              type="button"
-              onClick={copyPreviousDay}
-              disabled={saving}
-              className="btn-secondary"
-              title="Скопировать выбранный приём пищи для выбранного человека с предыдущего дня"
-            >
-              📋 Скопировать прошлый приём
-            </button>
-          </div>
+          <button type="submit" disabled={saving} className="btn-primary w-full">
+            {saving ? "Сохраняем…" : "Добавить"}
+          </button>
         </form>
 
         <section className="card lg:col-span-3">
