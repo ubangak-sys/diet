@@ -91,71 +91,59 @@ export function DinnerPlanView({
           <ul className="space-y-2">
             {plan.dinners.map((d, i) => (
               <li key={i} className="rounded-lg bg-stone-50 px-3 py-2">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium">
-                      {d.day != null && (
-                        <span className="mr-1 text-stone-400">
-                          День {d.day}.
-                        </span>
-                      )}
-                      {d.title}
-                    </div>
-                    {d.why && (
-                      <div className="mt-0.5 text-xs text-stone-500">
-                        {d.why}
-                      </div>
-                    )}
-                    {d.variants && d.variants.length > 0 && (
-                      <div className="mt-1 text-xs text-stone-500">
-                        <span className="font-medium text-stone-600">
-                          Варианты:
-                        </span>{" "}
-                        {d.variants.join(" · ")}
-                      </div>
-                    )}
-                    {d.time && (
-                      <div className="mt-1 text-xs text-stone-500">
-                        ⏱️ {d.time}
-                      </div>
-                    )}
-                    {d.steps && d.steps.length > 0 && (
-                      <div className="mt-1 rounded-md bg-white px-2 py-1 text-xs text-stone-600">
-                        <div className="font-medium">👨‍🍳 Приготовление:</div>
-                        <ol className="mt-1 list-decimal space-y-0.5 pl-4">
-                          {d.steps.map((s, j) => (
-                            <li key={j}>{s}</li>
-                          ))}
-                        </ol>
-                      </div>
-                    )}
+                <div className="text-sm font-medium">
+                  {d.day != null && (
+                    <span className="mr-1 text-stone-400">День {d.day}.</span>
+                  )}
+                  {d.title}
+                </div>
+                {d.why && (
+                  <div className="mt-0.5 text-xs text-stone-500">{d.why}</div>
+                )}
+                {d.variants && d.variants.length > 0 && (
+                  <div className="mt-1 text-xs text-stone-500">
+                    <span className="font-medium text-stone-600">Варианты:</span>{" "}
+                    {d.variants.join(" · ")}
                   </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => mark(i, d.title, "liked")}
-                      className={`rounded-full px-2 py-0.5 text-sm transition ${
-                        verdicts[i] === "liked"
-                          ? "bg-brand-600 text-white"
-                          : "bg-white text-stone-500 hover:bg-stone-200"
-                      }`}
-                      title="Зашло"
-                    >
-                      👍
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => mark(i, d.title, "disliked")}
-                      className={`rounded-full px-2 py-0.5 text-sm transition ${
-                        verdicts[i] === "disliked"
-                          ? "bg-red-600 text-white"
-                          : "bg-white text-stone-500 hover:bg-stone-200"
-                      }`}
-                      title="Не зашло"
-                    >
-                      👎
-                    </button>
+                )}
+                {d.time && (
+                  <div className="mt-1 text-xs text-stone-500">⏱️ {d.time}</div>
+                )}
+                {d.steps && d.steps.length > 0 && (
+                  <div className="mt-1 rounded-md bg-white px-2 py-1 text-xs text-stone-600">
+                    <div className="font-medium">👨‍🍳 Приготовление:</div>
+                    <ol className="mt-1 list-decimal space-y-0.5 pl-4">
+                      {d.steps.map((s, j) => (
+                        <li key={j}>{s}</li>
+                      ))}
+                    </ol>
                   </div>
+                )}
+                <div className="mt-2 flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => mark(i, d.title, "liked")}
+                    className={`rounded-full px-2.5 py-0.5 text-sm leading-none transition ${
+                      verdicts[i] === "liked"
+                        ? "bg-brand-600 text-white"
+                        : "bg-white text-stone-500 hover:bg-stone-200"
+                    }`}
+                    title="Зашло"
+                  >
+                    👍
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => mark(i, d.title, "disliked")}
+                    className={`rounded-full px-2.5 py-0.5 text-sm leading-none transition ${
+                      verdicts[i] === "disliked"
+                        ? "bg-red-600 text-white"
+                        : "bg-white text-stone-500 hover:bg-stone-200"
+                    }`}
+                    title="Не зашло"
+                  >
+                    👎
+                  </button>
                 </div>
               </li>
             ))}
